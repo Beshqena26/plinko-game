@@ -1,24 +1,33 @@
-import { RiskLevel } from '../utils/multipliers';
-import { soundManager } from '../utils/sound';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { RiskLevel } from '../utils/multipliers';
+import { sound } from '../utils/sound';
 
 interface BetControlsProps {
   balance: number;
   betAmount: number;
-  setBetAmount: (amount: number) => void;
+  setBetAmount: (v: number) => void;
   rows: number;
-  setRows: (rows: number) => void;
+  setRows: (v: number) => void;
   risk: RiskLevel;
-  setRisk: (risk: RiskLevel) => void;
-  isAutoBetting: boolean;
+  setRisk: (v: RiskLevel) => void;
+  isAuto: boolean;
   autoBetCount: number;
-  setAutoBetCount: (count: number) => void;
+  setAutoBetCount: (v: number) => void;
   onDrop: () => void;
-  onStartAutoBet: () => void;
-  onStopAutoBet: () => void;
-  onHalf: () => void;
-  onDouble: () => void;
+  onStartAuto: () => void;
+  onStopAuto: () => void;
+  disabled: boolean;
+  stopOnProfit: number;
+  setStopOnProfit: (v: number) => void;
+  stopOnLoss: number;
+  setStopOnLoss: (v: number) => void;
 }
+
+const RISK_LABELS: { value: RiskLevel; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
 
 export default function BetControls({
   balance,
@@ -28,178 +37,225 @@ export default function BetControls({
   setRows,
   risk,
   setRisk,
-  isAutoBetting,
+  isAuto,
   autoBetCount,
   setAutoBetCount,
   onDrop,
-  onStartAutoBet,
-  onStopAutoBet,
-  onHalf,
-  onDouble,
+  onStartAuto,
+  onStopAuto,
+  disabled,
+  stopOnProfit,
+  setStopOnProfit,
+  stopOnLoss,
+  setStopOnLoss,
 }: BetControlsProps) {
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [mode, setMode] = useState<'manual' | 'auto'>('manual');
+  const [soundOn, setSoundOn] = useState(true);
+  const riskIndex = RISK_LABELS.findIndex(r => r.value === risk);
 
-  const handleSoundToggle = () => {
-    const enabled = soundManager.toggle();
-    setSoundEnabled(enabled);
-  };
+  // Keyboard shortcut: Space to drop
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        if (mode === 'manual') {
+          onDrop();
+        } else if (!isAuto) {
+          onStartAuto();
+        } else {
+          onStopAuto();
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [mode, isAuto, onDrop, onStartAuto, onStopAuto]);
 
   return (
-    <div className="bg-bg-card rounded-xl p-5 flex flex-col gap-4 h-full">
-      {/* Mode Toggle */}
-      <div className="flex rounded-lg overflow-hidden border border-border">
-        <button
-          onClick={() => setMode('manual')}
-          className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-            mode === 'manual'
-              ? 'bg-accent-green/20 text-accent-green'
-              : 'bg-bg-input text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Manual
-        </button>
-        <button
-          onClick={() => setMode('auto')}
-          className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-            mode === 'auto'
-              ? 'bg-accent-green/20 text-accent-green'
-              : 'bg-bg-input text-text-secondary hover:text-text-primary'
-          }`}
-        >
-          Auto
-        </button>
-      </div>
-
-      {/* Balance Display */}
-      <div className="bg-bg-input rounded-lg p-3 border border-border">
-        <div className="text-xs text-text-secondary mb-1">Balance</div>
-        <div className="text-xl font-bold text-accent-green">
-          ${balance.toFixed(2)}
-        </div>
-      </div>
-
-      {/* Bet Amount */}
-      <div>
-        <label className="text-xs text-text-secondary mb-1.5 block">Bet Amount</label>
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm">$</span>
-            <input
-              type="number"
-              value={betAmount}
-              onChange={e => setBetAmount(Math.max(0.01, Math.min(10000, +e.target.value)))}
-              className="w-full bg-bg-input border border-border rounded-lg py-2.5 pl-7 pr-3 text-text-primary text-sm focus:outline-none focus:border-accent-green/50"
-              min={0.01}
-              max={10000}
-              step={0.01}
-            />
-          </div>
-          <button onClick={onHalf} className="bg-bg-input border border-border rounded-lg px-3 py-2.5 text-xs font-semibold text-text-secondary hover:text-text-primary hover:border-accent-green/30 transition-colors">
-            ½
-          </button>
-          <button onClick={onDouble} className="bg-bg-input border border-border rounded-lg px-3 py-2.5 text-xs font-semibold text-text-secondary hover:text-text-primary hover:border-accent-green/30 transition-colors">
-            2×
-          </button>
-        </div>
-      </div>
-
-      {/* Risk Level */}
-      <div>
-        <label className="text-xs text-text-secondary mb-1.5 block">Risk</label>
-        <div className="flex gap-1.5">
-          {(['low', 'medium', 'high'] as RiskLevel[]).map(r => (
-            <button
-              key={r}
-              onClick={() => setRisk(r)}
-              disabled={isAutoBetting}
-              className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-all ${
-                risk === r
-                  ? r === 'low'
-                    ? 'bg-accent-green/20 text-accent-green border border-accent-green/30'
-                    : r === 'medium'
-                    ? 'bg-accent-yellow/20 text-accent-yellow border border-accent-yellow/30'
-                    : 'bg-accent-red/20 text-accent-red border border-accent-red/30'
-                  : 'bg-bg-input text-text-secondary border border-border hover:text-text-primary'
+    <div className="flex flex-col h-full bg-[#100C1C] p-5 gap-4">
+      {/* Mode tabs */}
+      <div className="flex rounded-full overflow-hidden bg-[#000514] p-1">
+        {(['manual', 'auto'] as const).map(m => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`flex-1 py-2 rounded-full text-[13px] font-semibold capitalize transition-all
+              ${mode === m
+                ? 'bg-[#1A1726] text-white shadow-sm'
+                : 'text-[#73768C] hover:text-[#C2C5D6]'
               }`}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {/* Your Bet */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[13px] text-[#C2C5D6]">Your Bet</label>
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded-full bg-[#FBCE04] flex items-center justify-center text-[8px] font-bold text-[#000514]">$</span>
+            <span className="text-[13px] font-bold text-white">${balance.toFixed(2)}</span>
+          </div>
+        </div>
+        <div className="flex items-center bg-[#000514] rounded-lg border border-[#1A1726] focus-within:border-[#0ECC68]/40 transition-colors">
+          <span className="pl-3 flex items-center">
+            <span className="w-5 h-5 rounded-full bg-[#FBCE04] flex items-center justify-center text-[9px] font-bold text-[#000514]">$</span>
+          </span>
+          <input
+            type="number"
+            value={betAmount}
+            onChange={e => setBetAmount(Math.max(0, Math.min(10000, +e.target.value || 0)))}
+            className="flex-1 bg-transparent py-2.5 px-2.5 text-white text-[15px] font-medium outline-none"
+            step="0.01"
+          />
+        </div>
+        <div className="flex gap-1.5 mt-1.5">
+          {[
+            { label: 'MIN', action: () => setBetAmount(0.01) },
+            { label: '1/2', action: () => setBetAmount(Math.max(0.01, +(betAmount / 2).toFixed(2))) },
+            { label: 'X2', action: () => setBetAmount(Math.min(10000, +(betAmount * 2).toFixed(2))) },
+            { label: 'MAX', action: () => setBetAmount(Math.min(10000, balance)) },
+          ].map(btn => (
+            <button
+              key={btn.label}
+              onClick={btn.action}
+              className="flex-1 py-1.5 bg-[#000514] border border-[#1A1726] rounded-lg text-[11px] font-bold text-[#73768C] hover:text-[#C2C5D6] hover:border-[#0ECC68]/30 transition-all active:scale-95"
             >
-              {r}
+              {btn.label}
             </button>
           ))}
         </div>
       </div>
 
       {/* Rows */}
-      <div>
-        <label className="text-xs text-text-secondary mb-1.5 block">Rows: {rows}</label>
+      <div className="bg-[#000514] border border-[#1A1726] rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2.5">
+          <label className="text-[13px] text-[#C2C5D6]">Rows</label>
+          <span className="text-[15px] font-bold text-white">{rows}</span>
+        </div>
         <input
-          type="range"
-          min={8}
-          max={16}
-          value={rows}
+          type="range" min={8} max={16} value={rows}
           onChange={e => setRows(+e.target.value)}
-          disabled={isAutoBetting}
-          className="w-full accent-accent-green"
+          disabled={isAuto}
+          className="w-full disabled:opacity-40"
         />
-        <div className="flex justify-between text-[10px] text-text-secondary mt-1">
-          <span>8</span>
-          <span>12</span>
-          <span>16</span>
+      </div>
+
+      {/* Risk */}
+      <div className="bg-[#000514] border border-[#1A1726] rounded-lg p-3">
+        <div className="flex items-center justify-between mb-2.5">
+          <label className="text-[13px] text-[#C2C5D6]">Risk</label>
+          <span className="text-[15px] font-bold text-white">{RISK_LABELS[riskIndex].label}</span>
+        </div>
+        <input
+          type="range" min={0} max={2} value={riskIndex}
+          onChange={e => setRisk(RISK_LABELS[+e.target.value].value)}
+          disabled={isAuto}
+          className="w-full disabled:opacity-40"
+        />
+        <div className="flex justify-between px-[2px] mt-1.5">
+          {RISK_LABELS.map((r, i) => (
+            <div key={r.value} className={`w-2 h-2 rounded-full transition-colors ${i <= riskIndex ? 'bg-[#0ECC68]' : 'bg-[#1A1726]'}`} />
+          ))}
         </div>
       </div>
 
-      {/* Auto Bet Count */}
+      {/* Auto-bet options */}
       {mode === 'auto' && (
-        <div>
-          <label className="text-xs text-text-secondary mb-1.5 block">Number of Bets</label>
-          <input
-            type="number"
-            value={autoBetCount}
-            onChange={e => setAutoBetCount(Math.max(1, Math.min(100, +e.target.value)))}
-            className="w-full bg-bg-input border border-border rounded-lg py-2.5 px-3 text-text-primary text-sm focus:outline-none focus:border-accent-green/50"
-            min={1}
-            max={100}
-          />
-        </div>
+        <>
+          <div>
+            <label className="text-[13px] text-[#C2C5D6] mb-1.5 block">Number of Bets</label>
+            <input
+              type="number"
+              value={autoBetCount}
+              onChange={e => setAutoBetCount(Math.max(1, Math.min(1000, +e.target.value || 1)))}
+              className="w-full bg-[#000514] border border-[#1A1726] rounded-lg py-2.5 px-3 text-white text-sm font-medium outline-none focus:border-[#0ECC68]/40 transition-colors"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[11px] text-[#73768C] mb-1 block">Stop Profit</label>
+              <div className="flex items-center bg-[#000514] border border-[#1A1726] rounded-lg focus-within:border-[#0ECC68]/30">
+                <span className="pl-2 text-[#73768C] text-xs">$</span>
+                <input
+                  type="number"
+                  value={stopOnProfit || ''}
+                  onChange={e => setStopOnProfit(Math.max(0, +e.target.value || 0))}
+                  placeholder="0"
+                  className="w-full bg-transparent py-2 px-1.5 text-white text-xs font-medium outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex-1">
+              <label className="text-[11px] text-[#73768C] mb-1 block">Stop Loss</label>
+              <div className="flex items-center bg-[#000514] border border-[#1A1726] rounded-lg focus-within:border-[#ff003f]/30">
+                <span className="pl-2 text-[#73768C] text-xs">$</span>
+                <input
+                  type="number"
+                  value={stopOnLoss || ''}
+                  onChange={e => setStopOnLoss(Math.max(0, +e.target.value || 0))}
+                  placeholder="0"
+                  className="w-full bg-transparent py-2 px-1.5 text-white text-xs font-medium outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Drop Button */}
+      <div className="flex-1" />
+
+      {/* Bet button */}
       {mode === 'manual' ? (
         <button
           onClick={onDrop}
-          disabled={balance < betAmount}
-          className="w-full py-3.5 rounded-lg font-bold text-sm transition-all bg-accent-green text-bg-primary hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed mt-auto"
+          disabled={disabled || balance < betAmount || betAmount <= 0}
+          className="w-full py-3.5 rounded-xl font-bold text-[16px] transition-all
+            bg-[#0ECC68] text-[#000514] hover:bg-[#2cda7f] active:scale-[0.97]
+            disabled:opacity-30 disabled:cursor-not-allowed disabled:active:scale-100
+            shadow-[0_4px_24px_rgba(14,204,104,0.2)]"
         >
-          Drop Ball
+          Drop ball
+          <span className="ml-2 text-[11px] opacity-60 font-medium">[Space]</span>
         </button>
-      ) : isAutoBetting ? (
+      ) : isAuto ? (
         <button
-          onClick={onStopAutoBet}
-          className="w-full py-3.5 rounded-lg font-bold text-sm transition-all bg-accent-red text-white hover:brightness-110 active:scale-[0.98] mt-auto"
+          onClick={onStopAuto}
+          className="w-full py-3.5 rounded-xl font-bold text-[16px] transition-all
+            bg-[#ff003f] text-white hover:bg-[#ff2d5a] active:scale-[0.97]
+            shadow-[0_4px_24px_rgba(255,0,63,0.15)]"
         >
-          Stop Auto
+          Stop Autobet
+          <span className="ml-2 text-[11px] opacity-60 font-medium">[Space]</span>
         </button>
       ) : (
         <button
-          onClick={onStartAutoBet}
-          disabled={balance < betAmount}
-          className="w-full py-3.5 rounded-lg font-bold text-sm transition-all bg-accent-green text-bg-primary hover:brightness-110 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed mt-auto"
+          onClick={onStartAuto}
+          disabled={disabled || balance < betAmount || betAmount <= 0}
+          className="w-full py-3.5 rounded-xl font-bold text-[16px] transition-all
+            bg-[#0ECC68] text-[#000514] hover:bg-[#2cda7f] active:scale-[0.97]
+            disabled:opacity-30 disabled:cursor-not-allowed
+            shadow-[0_4px_24px_rgba(14,204,104,0.2)]"
         >
-          Start Auto ({autoBetCount})
+          Start Autobet
+          <span className="ml-2 text-[11px] opacity-60 font-medium">[Space]</span>
         </button>
       )}
 
-      {/* Sound Toggle */}
+      {/* Sound */}
       <button
-        onClick={handleSoundToggle}
-        className="flex items-center justify-center gap-2 text-xs text-text-secondary hover:text-text-primary transition-colors py-1"
+        onClick={() => { const s = sound.toggle(); setSoundOn(s); }}
+        className="flex items-center justify-center gap-1.5 py-1 text-[11px] text-[#73768C] hover:text-[#C2C5D6] transition-colors"
       >
-        {soundEnabled ? (
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        {soundOn ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
         )}
-        {soundEnabled ? 'Sound On' : 'Sound Off'}
+        {soundOn ? 'Sound On' : 'Sound Off'}
       </button>
     </div>
   );

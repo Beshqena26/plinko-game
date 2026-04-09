@@ -1,59 +1,65 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg-primary: #0a0e1a;
-  --color-bg-secondary: #111827;
-  --color-bg-card: #1a2235;
-  --color-bg-input: #0d1321;
-  --color-accent-green: #00e701;
-  --color-accent-red: #ff4757;
-  --color-accent-yellow: #ffa502;
-  --color-accent-orange: #ff6348;
-  --color-text-primary: #e2e8f0;
-  --color-text-secondary: #94a3b8;
-  --color-border: #2d3748;
-}
-
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
+  background-color: #000514;
+  color: #ffffff;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1A1726; border-radius: 2px; }
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
-::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
+input[type="number"] {
+  -moz-appearance: textfield;
 }
-::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
   border-radius: 3px;
+  background: #0ECC68;
 }
 
-@keyframes bucket-flash {
-  0% { filter: brightness(1); }
-  50% { filter: brightness(1.8); }
-  100% { filter: brightness(1); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 3px solid #0ECC68;
+  margin-top: -7px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.1s;
 }
 
-@keyframes win-popup {
-  0% { opacity: 0; transform: translateY(10px) scale(0.8); }
-  50% { opacity: 1; transform: translateY(-5px) scale(1.05); }
-  100% { opacity: 0; transform: translateY(-20px) scale(0.9); }
-}
-
-.bucket-flash {
-  animation: bucket-flash 0.4s ease-out;
-}
-
-.win-popup {
-  animation: win-popup 1.2s ease-out forwards;
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
 }

@@ -37,29 +37,18 @@ export const MULTIPLIER_MAP: Record<RiskLevel, Record<number, number[]>> = {
 };
 
 export function getMultipliers(risk: RiskLevel, rows: number): number[] {
-  return MULTIPLIER_MAP[risk][rows] || MULTIPLIER_MAP[risk][8];
+  return MULTIPLIER_MAP[risk][rows] || MULTIPLIER_MAP[risk][16];
 }
 
+// Stake-style symmetric color gradient: red edges → green center
 export function getMultiplierColor(multiplier: number): string {
-  if (multiplier >= 100) return '#ff0040';
-  if (multiplier >= 25) return '#ff2d55';
-  if (multiplier >= 10) return '#ff4757';
-  if (multiplier >= 5) return '#ff6348';
-  if (multiplier >= 3) return '#ffa502';
-  if (multiplier >= 2) return '#ffbe0b';
-  if (multiplier >= 1) return '#ffd93d';
-  if (multiplier >= 0.5) return '#6bdb6b';
-  return '#2ed573';
-}
-
-export function getMultiplierBgColor(multiplier: number): string {
-  if (multiplier >= 100) return 'rgba(255, 0, 64, 0.15)';
-  if (multiplier >= 25) return 'rgba(255, 45, 85, 0.15)';
-  if (multiplier >= 10) return 'rgba(255, 71, 87, 0.15)';
-  if (multiplier >= 5) return 'rgba(255, 99, 72, 0.15)';
-  if (multiplier >= 3) return 'rgba(255, 165, 2, 0.15)';
-  if (multiplier >= 2) return 'rgba(255, 190, 11, 0.15)';
-  if (multiplier >= 1) return 'rgba(255, 217, 61, 0.15)';
-  if (multiplier >= 0.5) return 'rgba(107, 219, 107, 0.15)';
-  return 'rgba(46, 213, 115, 0.15)';
+  if (multiplier >= 100) return '#ff003f';
+  if (multiplier >= 25)  return '#ff1744';
+  if (multiplier >= 10)  return '#ff5722';
+  if (multiplier >= 5)   return '#ff6d00';
+  if (multiplier >= 3)   return '#ff9100';
+  if (multiplier >= 2)   return '#ffc400';
+  if (multiplier >= 1)   return '#c6ff00';
+  if (multiplier >= 0.5) return '#76ff03';
+  return '#00e676';
 }
