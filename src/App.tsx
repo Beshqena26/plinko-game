@@ -6,23 +6,6 @@ import { getMultipliers, getMultiplierColor } from './utils/multipliers';
 import { getPath, randomHex } from './utils/provablyFair';
 import { sound } from './utils/sound';
 
-function useAnimatedNum(target: number) {
-  const [val, setVal] = useState(target);
-  const cur = useRef(target);
-  const raf = useRef(0);
-  useEffect(() => {
-    const go = () => {
-      const d = target - cur.current;
-      if (Math.abs(d) < 0.01) { cur.current = target; setVal(target); return; }
-      cur.current += d * 0.15; setVal(cur.current);
-      raf.current = requestAnimationFrame(go);
-    };
-    raf.current = requestAnimationFrame(go);
-    return () => cancelAnimationFrame(raf.current);
-  }, [target]);
-  return val;
-}
-
 export interface BetResult { id: number; mult: number; profit: number; color: string }
 
 export default function App() {
@@ -44,7 +27,6 @@ export default function App() {
   const pending = useRef(new Map<number, number>());
 
   const mults = getMultipliers(risk, rows);
-  const dispBal = useAnimatedNum(balance);
 
   const drop = useCallback(async () => {
     if (balance < betAmount || betAmount <= 0) return;
@@ -84,36 +66,33 @@ export default function App() {
   const stopAuto = useCallback(() => { autoRef.current = false; setIsAuto(false); }, []);
 
   return (
-    <div className="h-screen bg-[#000514] text-white flex flex-col select-none overflow-hidden">
+    <div className="h-screen bg-[#000514] text-white flex select-none overflow-hidden">
+      {/* Left panel */}
+      <aside className="w-[300px] shrink-0 bg-[#0D0B18] flex flex-col">
+        <BetPanel
+          balance={balance}
+          betAmount={betAmount}
+          setBetAmount={setBetAmount}
+          rows={rows}
+          setRows={setRows}
+          risk={risk}
+          setRisk={setRisk}
+          isAuto={isAuto}
+          autoBetCount={autoBetCount}
+          setAutoBetCount={setAutoBetCount}
+          onDrop={drop}
+          onStartAuto={startAuto}
+          onStopAuto={stopAuto}
+          canBet={balance >= betAmount && betAmount > 0}
+          history={history}
+        />
+      </aside>
+
       {/* Board */}
-      <div className="flex-1 min-h-0 relative">
+      <main className="flex-1 min-h-0">
         <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
           ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
-
-        {/* Floating results */}
-        {history.length > 0 && (
-          <div className="absolute top-3 right-3 flex gap-1 flex-wrap justify-end max-w-[240px]">
-            {history.slice(0, 8).map((r, i) => (
-              <div key={r.id}
-                className={`h-6 px-2 rounded text-[11px] font-bold tabular-nums flex items-center ${i === 0 ? 'anim-slide' : ''}`}
-                style={{ background: `${r.color}15`, color: r.color }}>
-                {r.mult}x
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Bottom controls */}
-      <div className="shrink-0 bg-[#0D0B18]/95 backdrop-blur-md border-t border-[#1A1726]/60">
-        <BetPanel
-          balance={dispBal} betAmount={betAmount} setBetAmount={setBetAmount}
-          rows={rows} setRows={setRows} risk={risk} setRisk={setRisk}
-          isAuto={isAuto} autoBetCount={autoBetCount} setAutoBetCount={setAutoBetCount}
-          onDrop={drop} onStartAuto={startAuto} onStopAuto={stopAuto}
-          canBet={balance >= betAmount && betAmount > 0}
-        />
-      </div>
+      </main>
     </div>
   );
 }
