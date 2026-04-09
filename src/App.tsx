@@ -104,75 +104,73 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#000514] text-white flex flex-col select-none">
-      {/* Header */}
-      <header className="h-14 bg-[#100C1C] border-b border-[#1A1726] flex items-center px-5 gap-4 shrink-0">
+      {/* ── Header ── */}
+      <header className="h-16 bg-[#100C1C] border-b border-[#1A1726] flex items-center px-6 gap-4 shrink-0">
         <div className="flex items-center gap-3 flex-1">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#0ECC68] to-[#087a3d] flex items-center justify-center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0ECC68] to-[#087a3d] flex items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
               <circle cx="12" cy="5" r="3"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/>
             </svg>
           </div>
-          <span className="text-lg font-bold">Plinko</span>
+          <span className="text-xl font-bold">Plinko</span>
         </div>
 
         <div className="flex items-center gap-3">
           {lastWin && (
-            <div className="anim-slide h-9 px-4 rounded-lg flex items-center gap-2 text-14 font-bold tabular-nums"
+            <div className="anim-slide h-10 px-4 rounded-xl flex items-center gap-2 text-sm font-bold tabular-nums"
               style={{ backgroundColor: `${lastWin.color}10`, border: `1px solid ${lastWin.color}20`, color: lastWin.color }}>
-              <span className="text-12 opacity-50">{lastWin.mult}x</span>
+              <span className="text-xs opacity-50">{lastWin.mult}x</span>
               {lastWin.amount >= 0 ? '+' : ''}{lastWin.amount.toFixed(2)}
             </div>
           )}
 
           {records.length > 0 && (
-            <div className={`hidden sm:flex h-9 px-4 rounded-lg items-center text-14 font-bold tabular-nums border
+            <div className={`hidden md:flex h-10 px-4 rounded-xl items-center text-sm font-bold tabular-nums border
               ${pl >= 0 ? 'bg-[#0ECC68]/5 border-[#0ECC68]/15 text-[#0ECC68]' : 'bg-[#ff003f]/5 border-[#ff003f]/15 text-[#ff003f]'}`}>
               {pl >= 0 ? '+' : ''}{pl.toFixed(2)}
             </div>
           )}
 
-          <div className="h-9 bg-[#000514] border border-[#1A1726] rounded-lg px-4 flex items-center gap-2.5 min-w-[128px]">
-            <div className="w-5 h-5 rounded-full bg-[#FBCE04] flex items-center justify-center">
-              <span className="text-[9px] font-black text-[#000514]">$</span>
+          <div className="h-10 bg-[#000514] border border-[#1A1726] rounded-xl px-5 flex items-center gap-3">
+            <div className="w-6 h-6 rounded-full bg-[#FBCE04] flex items-center justify-center">
+              <span className="text-[10px] font-black text-[#000514]">$</span>
             </div>
             <span className="text-base font-bold text-[#FBCE04] tabular-nums">{dispBal.toFixed(2)}</span>
           </div>
         </div>
       </header>
 
-      {/* Main */}
+      {/* ── Main ── */}
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div className="w-full lg:w-[280px] shrink-0 border-r border-[#1A1726] order-2 lg:order-1">
-          <BetControls
-            balance={balance} betAmount={betAmount} setBetAmount={setBetAmount}
-            rows={rows} setRows={setRows} risk={risk} setRisk={setRisk}
-            isAuto={isAuto} autoBetCount={autoBetCount} setAutoBetCount={setAutoBetCount}
-            onDrop={drop} onStartAuto={startAuto} onStopAuto={stopAuto} disabled={false}
-            stopOnProfit={stopOnProfit} setStopOnProfit={setStopOnProfit}
-            stopOnLoss={stopOnLoss} setStopOnLoss={setStopOnLoss}
-          />
+        {/* Board — center, takes all available space */}
+        <div className="flex-1 flex flex-col min-h-0 order-1">
+          {/* Game canvas */}
+          <div className="flex-1 min-h-[400px]">
+            <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
+              ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
+          </div>
+
+          {/* ── Bet Controls — below the board ── */}
+          <div className="border-t border-[#1A1726] bg-[#100C1C]">
+            <BetControls
+              balance={balance} betAmount={betAmount} setBetAmount={setBetAmount}
+              rows={rows} setRows={setRows} risk={risk} setRisk={setRisk}
+              isAuto={isAuto} autoBetCount={autoBetCount} setAutoBetCount={setAutoBetCount}
+              onDrop={drop} onStartAuto={startAuto} onStopAuto={stopAuto} disabled={false}
+              stopOnProfit={stopOnProfit} setStopOnProfit={setStopOnProfit}
+              stopOnLoss={stopOnLoss} setStopOnLoss={setStopOnLoss}
+            />
+          </div>
         </div>
 
-        <div className="flex-1 order-1 lg:order-2 min-h-[480px]">
-          <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
-            ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
-        </div>
-
-        <div className="hidden lg:block w-[220px] shrink-0 border-l border-[#1A1726] order-3">
+        {/* History — right sidebar */}
+        <div className="hidden lg:block w-[260px] shrink-0 border-l border-[#1A1726] order-2">
           <BetHistory records={records} />
         </div>
-        <div className="lg:hidden order-3 border-t border-[#1A1726] max-h-[220px]">
+        <div className="lg:hidden order-2 border-t border-[#1A1726] max-h-[240px]">
           <BetHistory records={records} />
         </div>
       </main>
-
-      <footer className="h-10 bg-[#100C1C] border-t border-[#1A1726] flex items-center justify-between px-5 shrink-0">
-        <span className="text-12 text-[#73768C]/60">Provably Fair — For Entertainment Only</span>
-        <div className="flex items-center gap-1.5 text-12 text-[#73768C]/30">
-          <kbd className="px-1.5 h-5 flex items-center rounded bg-[#1A1726] border border-[#2a2538] text-10 font-mono text-[#73768C]/50">Space</kbd>
-          <span>drop</span>
-        </div>
-      </footer>
     </div>
   );
 }
