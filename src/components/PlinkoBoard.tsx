@@ -12,40 +12,13 @@ interface PlinkoBoardProps {
   paths: Map<number, number[]>;
 }
 
-const PIN_RADIUS = 3.5;
+const PIN_RADIUS = 4;
 const BALL_RADIUS = 7;
 
-interface PinGlow {
-  x: number;
-  y: number;
-  time: number;
-}
-
-interface TrailDot {
-  x: number;
-  y: number;
-  time: number;
-}
-
-interface WinPopup {
-  x: number;
-  y: number;
-  mult: number;
-  payout: number;
-  time: number;
-  color: string;
-}
-
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  maxLife: number;
-  color: string;
-  size: number;
-}
+interface PinGlow { x: number; y: number; time: number }
+interface TrailDot { x: number; y: number; time: number }
+interface WinPopup { x: number; y: number; mult: number; time: number; color: string }
+interface Particle { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; color: string; size: number }
 
 export default function PlinkoBoard({
   rows,
@@ -66,12 +39,17 @@ export default function PlinkoBoard({
   const pinGlowsRef = useRef<PinGlow[]>([]);
   const winPopupsRef = useRef<WinPopup[]>([]);
   const particlesRef = useRef<Particle[]>([]);
+  const pinMapRef = useRef<Map<string, { x: number; y: number; row: number; col: number }>>(new Map());
 
   const getGeometry = useCallback((w: number, h: number) => {
-    const gap = Math.min(42, Math.min((w - 80) / (rows + 3), (h - 140) / (rows + 2)));
+    // Gap scales with both width and height to keep board centered
+    const maxGapW = (w - 60) / (rows + 4);
+    const maxGapH = (h - 120) / (rows + 2);
+    const gap = Math.min(38, maxGapW, maxGapH);
     const boardH = gap * (rows + 1);
-    const startY = (h - boardH) / 2 - 20;
+    const startY = (h - boardH) / 2 + 5;
     const pins: { x: number; y: number; row: number; col: number }[] = [];
+
     for (let r = 0; r <= rows; r++) {
       const count = r + 3;
       const y = startY + r * gap;
@@ -87,9 +65,9 @@ export default function PlinkoBoard({
 
   // Engine
   useEffect(() => {
-    const engine = Matter.Engine.create({ gravity: { x: 0, y: 1.8, scale: 0.001 } });
+    const engine = Matter.Engine.create({ gravity: { x: 0, y: 1.2, scale: 0.001 } });
     engineRef.current = engine;
-    const runner = Matter.Runner.create({ delta: 1000 / 120 });
+    const runner = Matter.Runner.create({ delta: 1000 / 60 });
     runnerRef.current = runner;
     Matter.Runner.run(runner, engine);
     return () => {
@@ -99,7 +77,7 @@ export default function PlinkoBoard({
     };
   }, []);
 
-  // Build pins
+  // Build world
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
@@ -109,6 +87,7 @@ export default function PlinkoBoard({
     pinGlowsRef.current = [];
     winPopupsRef.current = [];
     particlesRef.current = [];
+    pinMapRef.current.clear();
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -117,28 +96,36 @@ export default function PlinkoBoard({
     sizeRef.current = { w, h };
     const { pins, endY, gap } = getGeometry(w, h);
 
+    // Create pin bodies — bigger collision radius to prevent ball escaping
     pins.forEach(p => {
-      Matter.Composite.add(engine.world,
-        Matter.Bodies.circle(p.x, p.y, PIN_RADIUS, {
-          isStatic: true, restitution: 0.5, friction: 0.1, label: `pin-${p.row}-${p.col}`,
-        })
-      );
+      const body = Matter.Bodies.circle(p.x, p.y, PIN_RADIUS + 1, {
+        isStatic: true,
+        restitution: 0.6,
+        friction: 0.0,
+        label: `pin-${p.row}-${p.col}`,
+      });
+      Matter.Composite.add(engine.world, body);
+      pinMapRef.current.set(`${p.row}-${p.col}`, p);
     });
 
-    const bucketY = endY + gap * 0.7;
+    // Floor
+    const bucketY = endY + gap * 0.65;
     Matter.Composite.add(engine.world, [
-      Matter.Bodies.rectangle(w / 2, bucketY + 40, w * 2, 20, { isStatic: true, label: 'floor' }),
-      Matter.Bodies.rectangle(-10, h / 2, 20, h * 2, { isStatic: true }),
-      Matter.Bodies.rectangle(w + 10, h / 2, 20, h * 2, { isStatic: true }),
+      Matter.Bodies.rectangle(w / 2, bucketY + 35, w * 2, 20, { isStatic: true, label: 'floor', restitution: 0.1 }),
+      Matter.Bodies.rectangle(-15, h / 2, 30, h * 2, { isStatic: true }),
+      Matter.Bodies.rectangle(w + 15, h / 2, 30, h * 2, { isStatic: true }),
     ]);
 
+    // Bucket dividers — taller to catch balls
     const numBuckets = rows + 1;
     const totalBW = rows * gap;
     const bw = totalBW / numBuckets;
     const bsx = (w - totalBW) / 2;
     for (let i = 0; i <= numBuckets; i++) {
       Matter.Composite.add(engine.world,
-        Matter.Bodies.rectangle(bsx + i * bw, bucketY + 10, 2, 30, { isStatic: true, restitution: 0.3, label: 'divider' })
+        Matter.Bodies.rectangle(bsx + i * bw, bucketY + 8, 3, 36, {
+          isStatic: true, restitution: 0.2, label: 'divider',
+        })
       );
     }
   }, [rows, getGeometry]);
@@ -163,7 +150,7 @@ export default function PlinkoBoard({
     return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Collisions
+  // Collisions — apply directional bias on pin hit
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
@@ -179,13 +166,18 @@ export default function PlinkoBoard({
           const pinRow = parseInt(pin.label.split('-')[1]);
           const info = activeBallsRef.current.get(ballId);
           if (!info || pinRow < info.row) return;
+
           const dir = info.dirs[pinRow] ?? (Math.random() > 0.5 ? 1 : 0);
-          Matter.Body.applyForce(ball, ball.position, { x: dir === 1 ? 0.00035 : -0.00035, y: 0 });
           info.row = pinRow + 1;
           sound.pinHit(pinRow / rows);
-
-          // Pin glow effect
           pinGlowsRef.current.push({ x: pin.position.x, y: pin.position.y, time: Date.now() });
+
+          // Apply horizontal velocity directly — much more reliable than force
+          const speed = Math.abs(ball.velocity.y) * 0.6 + 0.8;
+          Matter.Body.setVelocity(ball, {
+            x: dir === 1 ? speed : -speed,
+            y: ball.velocity.y * 0.4 + 0.5, // dampen vertical, keep falling
+          });
         }
 
         if (ball && (bodyA.label === 'floor' || bodyB.label === 'floor')) {
@@ -205,40 +197,26 @@ export default function PlinkoBoard({
           flashRef.current.set(clampedIdx, Date.now());
           const mult = multipliers[clampedIdx] || 0;
           const color = getMultiplierColor(mult);
-
-          // Win popup
-          const popupX = bsx + clampedIdx * bw + bw / 2;
           const bucketTopY = endY + gap * 0.35;
-          winPopupsRef.current.push({
-            x: popupX,
-            y: bucketTopY - 10,
-            mult,
-            payout: mult, // Will show multiplier
-            time: Date.now(),
-            color,
-          });
+          const popupX = bsx + clampedIdx * bw + bw / 2;
 
-          // Particles for big wins
+          winPopupsRef.current.push({ x: popupX, y: bucketTopY - 10, mult, time: Date.now(), color });
+
           if (mult >= 5) {
             const count = mult >= 50 ? 40 : mult >= 10 ? 25 : 12;
             for (let p = 0; p < count; p++) {
               const angle = (Math.PI * 2 * p) / count + (Math.random() - 0.5) * 0.5;
-              const speed = 1.5 + Math.random() * 3;
+              const spd = 1.5 + Math.random() * 3;
               particlesRef.current.push({
-                x: popupX,
-                y: bucketTopY,
-                vx: Math.cos(angle) * speed,
-                vy: Math.sin(angle) * speed - 2,
-                life: 1,
-                maxLife: 0.6 + Math.random() * 0.6,
-                color,
-                size: 2 + Math.random() * 3,
+                x: popupX, y: bucketTopY,
+                vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd - 2,
+                life: 1, maxLife: 0.6 + Math.random() * 0.6,
+                color, size: 2 + Math.random() * 3,
               });
             }
           }
 
           onBallLand(clampedIdx);
-
           setTimeout(() => {
             if (engineRef.current) Matter.Composite.remove(engineRef.current.world, ball);
             activeBallsRef.current.delete(ballId);
@@ -261,9 +239,18 @@ export default function PlinkoBoard({
 
     ballQueue.forEach(id => {
       const dirs = paths.get(id) || [];
-      const ball = Matter.Bodies.circle(w / 2 + (Math.random() - 0.5) * 6, startY - 30, BALL_RADIUS, {
-        restitution: 0.5, friction: 0.1, density: 0.002, label: `ball-${id}`,
-      });
+      const ball = Matter.Bodies.circle(
+        w / 2 + (Math.random() - 0.5) * 4,
+        startY - 25,
+        BALL_RADIUS,
+        {
+          restitution: 0.4,
+          friction: 0.05,
+          density: 0.003,
+          label: `ball-${id}`,
+        }
+      );
+      Matter.Body.setVelocity(ball, { x: 0, y: 1 }); // Small initial downward push
       Matter.Composite.add(engine.world, ball);
       activeBallsRef.current.set(id, { body: ball, row: 0, dirs, trail: [] });
       onBallConsumed(id);
@@ -293,37 +280,33 @@ export default function PlinkoBoard({
       const { pins, gap, endY } = getGeometry(w, h);
       const now = Date.now();
 
-      // Clean up old pin glows
-      pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 200);
-
-      // Draw pin glows BEHIND pins
+      // Pin glows (behind pins)
+      pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       pinGlowsRef.current.forEach(g => {
-        const age = (now - g.time) / 200;
+        const age = (now - g.time) / 250;
         const alpha = (1 - age) * 0.5;
-        const radius = PIN_RADIUS + 6 + age * 4;
+        const radius = PIN_RADIUS + 8 + age * 5;
         const grd = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, radius);
         grd.addColorStop(0, `rgba(14, 204, 104, ${alpha})`);
-        grd.addColorStop(1, `rgba(14, 204, 104, 0)`);
+        grd.addColorStop(1, 'rgba(14, 204, 104, 0)');
         ctx.beginPath();
         ctx.arc(g.x, g.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = grd;
         ctx.fill();
       });
 
-      // Draw pins
+      // Pins
       pins.forEach(pin => {
-        // Check if this pin was recently hit
         const isHit = pinGlowsRef.current.some(g =>
-          Math.abs(g.x - pin.x) < 1 && Math.abs(g.y - pin.y) < 1
+          Math.abs(g.x - pin.x) < 2 && Math.abs(g.y - pin.y) < 2
         );
-
-        const g = ctx.createRadialGradient(pin.x - 0.8, pin.y - 0.8, 0, pin.x, pin.y, PIN_RADIUS);
+        const g = ctx.createRadialGradient(pin.x - 0.5, pin.y - 0.5, 0, pin.x, pin.y, PIN_RADIUS);
         if (isHit) {
-          g.addColorStop(0, 'rgba(14, 204, 104, 0.95)');
+          g.addColorStop(0, 'rgba(14, 204, 104, 1)');
           g.addColorStop(1, 'rgba(14, 204, 104, 0.6)');
         } else {
-          g.addColorStop(0, 'rgba(194, 197, 214, 0.65)');
-          g.addColorStop(1, 'rgba(115, 118, 140, 0.35)');
+          g.addColorStop(0, 'rgba(194, 197, 214, 0.6)');
+          g.addColorStop(1, 'rgba(115, 118, 140, 0.3)');
         }
         ctx.beginPath();
         ctx.arc(pin.x, pin.y, isHit ? PIN_RADIUS + 0.5 : PIN_RADIUS, 0, Math.PI * 2);
@@ -331,12 +314,12 @@ export default function PlinkoBoard({
         ctx.fill();
       });
 
-      // Buckets
+      // Buckets + labels
       const numBuckets = rows + 1;
       const totalBW = rows * gap;
       const bw = totalBW / numBuckets;
       const bsx = (w - totalBW) / 2;
-      const bucketTopY = endY + gap * 0.35;
+      const bucketTopY = endY + gap * 0.3;
 
       multipliers.forEach((mult, i) => {
         const x = bsx + i * bw;
@@ -344,37 +327,34 @@ export default function PlinkoBoard({
         const flashTime = flashRef.current.get(i);
         const isFlashing = flashTime && now - flashTime < 500;
         const flashI = isFlashing ? 1 - (now - flashTime!) / 500 : 0;
+        const [bR, bG, bB] = hexToRgb(color);
 
-        const [baseR, baseG, baseB] = hexToRgb(color);
-
-        // 3D Bucket
-        const cupW = bw - 3;
-        const cupH = 22;
-        const taperInset = cupW * 0.12;
+        // 3D Bucket trapezoid
+        const cupW = bw - 2;
+        const cupH = 24;
+        const taper = cupW * 0.1;
 
         ctx.beginPath();
-        ctx.moveTo(x + 1.5 + taperInset, bucketTopY);
-        ctx.lineTo(x + 1.5, bucketTopY + cupH);
-        ctx.lineTo(x + 1.5 + cupW, bucketTopY + cupH);
-        ctx.lineTo(x + 1.5 + cupW - taperInset, bucketTopY);
+        ctx.moveTo(x + 1 + taper, bucketTopY);
+        ctx.lineTo(x + 1, bucketTopY + cupH);
+        ctx.lineTo(x + 1 + cupW, bucketTopY + cupH);
+        ctx.lineTo(x + 1 + cupW - taper, bucketTopY);
         ctx.closePath();
 
-        ctx.fillStyle = `rgb(${baseR * 0.3 | 0}, ${baseG * 0.3 | 0}, ${baseB * 0.3 | 0})`;
+        // Fill
+        const fg = ctx.createLinearGradient(x, bucketTopY, x, bucketTopY + cupH);
+        fg.addColorStop(0, `rgba(${bR}, ${bG}, ${bB}, ${0.65 + flashI * 0.35})`);
+        fg.addColorStop(0.5, `rgba(${bR * 0.5 | 0}, ${bG * 0.5 | 0}, ${bB * 0.5 | 0}, ${0.5 + flashI * 0.3})`);
+        fg.addColorStop(1, `rgba(${bR * 0.15 | 0}, ${bG * 0.15 | 0}, ${bB * 0.15 | 0}, 0.8)`);
+        ctx.fillStyle = fg;
         ctx.fill();
 
-        const frontG = ctx.createLinearGradient(x, bucketTopY, x, bucketTopY + cupH);
-        frontG.addColorStop(0, `rgba(${baseR}, ${baseG}, ${baseB}, ${0.55 + flashI * 0.45})`);
-        frontG.addColorStop(0.6, `rgba(${baseR * 0.6 | 0}, ${baseG * 0.6 | 0}, ${baseB * 0.6 | 0}, ${0.45 + flashI * 0.35})`);
-        frontG.addColorStop(1, `rgba(${baseR * 0.2 | 0}, ${baseG * 0.2 | 0}, ${baseB * 0.2 | 0}, 0.7)`);
-        ctx.fillStyle = frontG;
-        ctx.fill();
-
-        // Rim
+        // Rim highlight
         ctx.beginPath();
-        ctx.moveTo(x + 1.5 + taperInset, bucketTopY);
-        ctx.lineTo(x + 1.5 + cupW - taperInset, bucketTopY);
-        ctx.lineWidth = isFlashing ? 2.5 : 2;
-        ctx.strokeStyle = `rgba(${baseR}, ${baseG}, ${baseB}, ${0.7 + flashI * 0.3})`;
+        ctx.moveTo(x + 1 + taper, bucketTopY);
+        ctx.lineTo(x + 1 + cupW - taper, bucketTopY);
+        ctx.lineWidth = isFlashing ? 2.5 : 1.5;
+        ctx.strokeStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.8 + flashI * 0.2})`;
         ctx.stroke();
 
         // Flash glow
@@ -384,25 +364,26 @@ export default function PlinkoBoard({
           ctx.shadowBlur = 20 * flashI;
           ctx.beginPath();
           ctx.arc(x + bw / 2, bucketTopY + cupH / 2, cupW / 3, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(${baseR}, ${baseG}, ${baseB}, ${flashI * 0.3})`;
+          ctx.fillStyle = `rgba(${bR}, ${bG}, ${bB}, ${flashI * 0.3})`;
           ctx.fill();
           ctx.restore();
         }
 
-        // Label
-        const labelY = bucketTopY + cupH + 14;
-        const fontSize = bw < 28 ? 7 : bw < 38 ? 8 : bw < 48 ? 9 : 10;
+        // Label below bucket
+        const labelY = bucketTopY + cupH + 15;
+        const fontSize = bw < 26 ? 7 : bw < 34 ? 8 : bw < 44 ? 9 : 10;
         ctx.font = `bold ${fontSize}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const label = mult >= 1000 ? `${(mult / 1000).toFixed(0)}K` : `${mult}X`;
         const tw = ctx.measureText(label).width;
 
+        // Label pill bg
         ctx.beginPath();
-        ctx.roundRect(x + bw / 2 - tw / 2 - 4, labelY - 7, tw + 8, 14, 3);
-        ctx.fillStyle = `rgba(${baseR}, ${baseG}, ${baseB}, ${0.12 + flashI * 0.2})`;
+        ctx.roundRect(x + bw / 2 - tw / 2 - 5, labelY - 8, tw + 10, 16, 4);
+        ctx.fillStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.15 + flashI * 0.25})`;
         ctx.fill();
-        ctx.strokeStyle = `rgba(${baseR}, ${baseG}, ${baseB}, ${0.2 + flashI * 0.3})`;
+        ctx.strokeStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.25 + flashI * 0.3})`;
         ctx.lineWidth = 0.5;
         ctx.stroke();
 
@@ -412,114 +393,104 @@ export default function PlinkoBoard({
         ctx.globalAlpha = 1;
       });
 
-      // Update & draw particles
+      // Particles
       particlesRef.current = particlesRef.current.filter(p => p.life > 0);
       particlesRef.current.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.06; // gravity
+        p.x += p.vx; p.y += p.vy; p.vy += 0.06;
         p.life -= 1 / (60 * p.maxLife);
-        const alpha = Math.max(0, p.life);
+        const a = Math.max(0, p.life);
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.size * a, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = alpha * 0.8;
+        ctx.globalAlpha = a * 0.8;
         ctx.fill();
         ctx.globalAlpha = 1;
       });
 
-      // Draw ball trails + balls
+      // Ball trails + balls
       activeBallsRef.current.forEach(info => {
         const { body, trail } = info;
         const { x, y } = body.position;
 
-        // Add trail dot
         trail.push({ x, y, time: now });
-        // Keep last 12
-        while (trail.length > 12) trail.shift();
+        while (trail.length > 10) trail.shift();
 
-        // Draw trail
-        trail.forEach((dot, idx) => {
-          const age = (now - dot.time) / 150;
-          if (age > 1) return;
-          const alpha = (1 - age) * 0.25 * (idx / trail.length);
-          const size = BALL_RADIUS * (1 - age) * 0.6;
-          if (size <= 0) return;
+        // Trail
+        for (let t = 0; t < trail.length - 1; t++) {
+          const dot = trail[t];
+          const age = (now - dot.time) / 120;
+          if (age > 1) continue;
+          const alpha = (1 - age) * 0.2 * (t / trail.length);
+          const size = BALL_RADIUS * (1 - age) * 0.5;
+          if (size <= 0) continue;
           ctx.beginPath();
           ctx.arc(dot.x, dot.y, size, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(251, 206, 4, ${alpha})`;
           ctx.fill();
-        });
+        }
 
         // Ball glow
-        const glowG = ctx.createRadialGradient(x, y, BALL_RADIUS, x, y, BALL_RADIUS + 12);
-        glowG.addColorStop(0, 'rgba(251, 206, 4, 0.3)');
+        const glowG = ctx.createRadialGradient(x, y, BALL_RADIUS, x, y, BALL_RADIUS + 14);
+        glowG.addColorStop(0, 'rgba(251, 206, 4, 0.25)');
         glowG.addColorStop(1, 'rgba(251, 206, 4, 0)');
         ctx.beginPath();
-        ctx.arc(x, y, BALL_RADIUS + 12, 0, Math.PI * 2);
+        ctx.arc(x, y, BALL_RADIUS + 14, 0, Math.PI * 2);
         ctx.fillStyle = glowG;
         ctx.fill();
 
-        // Ball body
-        const ballG = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, BALL_RADIUS);
-        ballG.addColorStop(0, '#fff8dc');
-        ballG.addColorStop(0.3, '#FBCE04');
-        ballG.addColorStop(0.7, '#d4a904');
-        ballG.addColorStop(1, '#8a6f02');
+        // Ball
+        const bg = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, BALL_RADIUS);
+        bg.addColorStop(0, '#fff8dc');
+        bg.addColorStop(0.3, '#FBCE04');
+        bg.addColorStop(0.7, '#d4a904');
+        bg.addColorStop(1, '#8a6f02');
         ctx.beginPath();
         ctx.arc(x, y, BALL_RADIUS, 0, Math.PI * 2);
-        ctx.fillStyle = ballG;
+        ctx.fillStyle = bg;
         ctx.fill();
 
         // Specular
         ctx.beginPath();
-        ctx.arc(x - 2, y - 2.5, BALL_RADIUS * 0.3, 0, Math.PI * 2);
+        ctx.arc(x - 2, y - 2.5, BALL_RADIUS * 0.28, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
         ctx.fill();
       });
 
-      // Win popups — float upward and fade
-      winPopupsRef.current = winPopupsRef.current.filter(p => now - p.time < 1500);
+      // Win popups
+      winPopupsRef.current = winPopupsRef.current.filter(p => now - p.time < 1400);
       winPopupsRef.current.forEach(p => {
-        const age = (now - p.time) / 1500;
-        const alpha = age < 0.2 ? age / 0.2 : age > 0.7 ? (1 - age) / 0.3 : 1;
-        const offsetY = age * 50;
-        const scale = 0.8 + Math.sin(age * Math.PI) * 0.3;
+        const age = (now - p.time) / 1400;
+        const alpha = age < 0.15 ? age / 0.15 : age > 0.65 ? (1 - age) / 0.35 : 1;
+        const offsetY = age * 55;
+        const scale = 0.7 + Math.sin(age * Math.PI) * 0.35;
 
         ctx.save();
         ctx.translate(p.x, p.y - offsetY);
         ctx.scale(scale, scale);
         ctx.globalAlpha = Math.max(0, alpha);
 
-        const text = `${p.mult}X`;
+        const text = p.mult >= 1000 ? `${(p.mult / 1000).toFixed(0)}K` : `${p.mult}X`;
         ctx.font = `bold ${p.mult >= 10 ? 16 : 13}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // Background pill
-        const tw = ctx.measureText(text).width;
+        const tmw = ctx.measureText(text).width;
         ctx.beginPath();
-        ctx.roundRect(-tw / 2 - 8, -11, tw + 16, 22, 11);
+        ctx.roundRect(-tmw / 2 - 8, -11, tmw + 16, 22, 11);
         ctx.fillStyle = p.color;
         ctx.globalAlpha = Math.max(0, alpha * 0.2);
         ctx.fill();
-
-        // Border
         ctx.strokeStyle = p.color;
         ctx.lineWidth = 1.5;
         ctx.globalAlpha = Math.max(0, alpha * 0.5);
         ctx.stroke();
-
-        // Text
         ctx.globalAlpha = Math.max(0, alpha);
         ctx.fillStyle = p.color;
         ctx.fillText(text, 0, 0);
-
         ctx.restore();
         ctx.globalAlpha = 1;
       });
 
-      // Cleanup flashes
       flashRef.current.forEach((time, idx) => {
         if (now - time > 600) flashRef.current.delete(idx);
       });
@@ -539,30 +510,23 @@ export default function PlinkoBoard({
 }
 
 function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return [r, g, b];
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 }
 
 function drawStoneBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const blockW = 80;
-  const blockH = 50;
-  ctx.globalAlpha = 0.03;
-  for (let row = 0; row < Math.ceil(h / blockH) + 1; row++) {
-    const offset = row % 2 === 0 ? 0 : blockW / 2;
-    for (let col = -1; col < Math.ceil(w / blockW) + 1; col++) {
-      const bx = col * blockW + offset;
-      const by = row * blockH;
+  ctx.globalAlpha = 0.025;
+  const bW = 80, bH = 50;
+  for (let row = 0; row < Math.ceil(h / bH) + 1; row++) {
+    const off = row % 2 === 0 ? 0 : bW / 2;
+    for (let col = -1; col < Math.ceil(w / bW) + 1; col++) {
       ctx.strokeStyle = '#73768C';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(bx + 2, by + 2, blockW - 4, blockH - 4, 4);
+      ctx.roundRect(col * bW + off + 2, row * bH + 2, bW - 4, bH - 4, 4);
       ctx.stroke();
     }
   }
   ctx.globalAlpha = 1;
-
   const vig = ctx.createRadialGradient(w / 2, h / 2, w * 0.15, w / 2, h / 2, w * 0.75);
   vig.addColorStop(0, 'rgba(0,5,20,0)');
   vig.addColorStop(1, 'rgba(0,5,20,0.55)');
