@@ -84,9 +84,28 @@ export default function App() {
   const stopAuto = useCallback(() => { autoRef.current = false; setIsAuto(false); }, []);
 
   return (
-    <div className="h-screen bg-[#000514] text-white flex select-none overflow-hidden">
-      {/* Left panel */}
-      <div className="w-[320px] shrink-0 bg-[#0D0B18] border-r border-[#1A1726] flex flex-col">
+    <div className="h-screen bg-[#000514] text-white flex flex-col select-none overflow-hidden">
+      {/* Board — fills all available space */}
+      <div className="flex-1 min-h-0 relative">
+        <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
+          ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
+
+        {/* Recent results — floating top-right */}
+        {history.length > 0 && (
+          <div className="absolute top-4 right-4 flex gap-1.5 flex-wrap justify-end max-w-[280px]">
+            {history.slice(0, 10).map((r, i) => (
+              <div key={r.id}
+                className={`h-7 px-2.5 rounded-lg text-xs font-bold tabular-nums flex items-center backdrop-blur-sm ${i === 0 ? 'anim-slide' : ''}`}
+                style={{ background: `${r.color}18`, border: `1px solid ${r.color}25`, color: r.color }}>
+                {r.mult}x
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Controls — bottom panel */}
+      <div className="shrink-0 bg-[#0D0B18] border-t border-[#1A1726]">
         <BetPanel
           balance={dispBal}
           betAmount={betAmount}
@@ -102,14 +121,7 @@ export default function App() {
           onStartAuto={startAuto}
           onStopAuto={stopAuto}
           canBet={balance >= betAmount && betAmount > 0}
-          history={history}
         />
-      </div>
-
-      {/* Board */}
-      <div className="flex-1 min-h-0">
-        <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
-          ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
       </div>
     </div>
   );
