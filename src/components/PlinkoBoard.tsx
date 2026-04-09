@@ -39,17 +39,22 @@ export default function PlinkoBoard({
   const pinGlowsRef = useRef<PinGlow[]>([]);
   const winPopupsRef = useRef<WinPopup[]>([]);
   const particlesRef = useRef<Particle[]>([]);
-  const pinMapRef = useRef<Map<string, { x: number; y: number; row: number; col: number }>>(new Map());
 
+  // Geometry: row r has (r+3) pins, spaced by gap.
+  // Bottom row (r=rows) has (rows+3) pins, spanning (rows+2)*gap.
+  // Buckets = rows+1 slots, aligned to bottom row.
   const getGeometry = useCallback((w: number, h: number) => {
-    // Gap scales with both width and height to keep board centered
-    const maxGapW = (w - 60) / (rows + 4);
-    const maxGapH = (h - 120) / (rows + 2);
-    const gap = Math.min(38, maxGapW, maxGapH);
-    const boardH = gap * (rows + 1);
-    const startY = (h - boardH) / 2 + 5;
-    const pins: { x: number; y: number; row: number; col: number }[] = [];
+    const bottomPinCount = rows + 3;
+    const bottomSpan = bottomPinCount - 1; // in gap units
 
+    const maxGapW = (w - 60) / (bottomSpan + 1);
+    const maxGapH = (h - 130) / (rows + 2);
+    const gap = Math.min(38, maxGapW, maxGapH);
+
+    const boardH = gap * rows;
+    const startY = (h - boardH) / 2 - 10;
+
+    const pins: { x: number; y: number; row: number; col: number }[] = [];
     for (let r = 0; r <= rows; r++) {
       const count = r + 3;
       const y = startY + r * gap;
@@ -59,8 +64,20 @@ export default function PlinkoBoard({
         pins.push({ x: sx + c * gap, y, row: r, col: c });
       }
     }
+
     const endY = startY + rows * gap;
-    return { gap, startY, endY, pins };
+
+    // Bottom row bounds
+    const bottomTotalW = bottomSpan * gap;
+    const bottomLeftX = (w - bottomTotalW) / 2;
+    const bottomRightX = bottomLeftX + bottomTotalW;
+
+    // Top row (row 0) bounds: 3 pins, span = 2*gap
+    const topTotalW = 2 * gap;
+    const topLeftX = (w - topTotalW) / 2;
+    const topRightX = topLeftX + topTotalW;
+
+    return { gap, startY, endY, pins, bottomLeftX, bottomRightX, topLeftX, topRightX };
   }, [rows]);
 
   // Engine
@@ -87,43 +104,75 @@ export default function PlinkoBoard({
     pinGlowsRef.current = [];
     winPopupsRef.current = [];
     particlesRef.current = [];
-    pinMapRef.current.clear();
 
     const canvas = canvasRef.current;
     if (!canvas) return;
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
     sizeRef.current = { w, h };
-    const { pins, endY, gap } = getGeometry(w, h);
+    const geo = getGeometry(w, h);
+    const { pins, endY, gap, topLeftX, topRightX, bottomLeftX, bottomRightX, startY } = geo;
 
-    // Create pin bodies — bigger collision radius to prevent ball escaping
+    // Pins
     pins.forEach(p => {
-      const body = Matter.Bodies.circle(p.x, p.y, PIN_RADIUS + 1, {
-        isStatic: true,
-        restitution: 0.6,
-        friction: 0.0,
-        label: `pin-${p.row}-${p.col}`,
-      });
-      Matter.Composite.add(engine.world, body);
-      pinMapRef.current.set(`${p.row}-${p.col}`, p);
+      Matter.Composite.add(engine.world,
+        Matter.Bodies.circle(p.x, p.y, PIN_RADIUS + 1.5, {
+          isStatic: true, restitution: 0.5, friction: 0.0, label: `pin-${p.row}-${p.col}`,
+        })
+      );
     });
 
-    // Floor
+    // Angled boundary walls along triangle edges (keeps balls inside)
+    const wallPadding = BALL_RADIUS + 5;
+    const wallThickness = 10;
+
+    // Left wall: from top-left pin to bottom-left pin
+    const leftWallLen = Math.sqrt(
+      (bottomLeftX - topLeftX) ** 2 + (endY - startY) ** 2
+    ) + gap;
+    const leftWallAngle = Math.atan2(endY - startY, (bottomLeftX - wallPadding) - (topLeftX - wallPadding));
+    const leftWallCx = ((topLeftX - wallPadding) + (bottomLeftX - wallPadding)) / 2;
+    const leftWallCy = (startY - gap / 2 + endY + gap / 2) / 2;
+    Matter.Composite.add(engine.world,
+      Matter.Bodies.rectangle(leftWallCx, leftWallCy, leftWallLen, wallThickness, {
+        isStatic: true, angle: leftWallAngle, restitution: 0.3, label: 'wallL',
+      })
+    );
+
+    // Right wall
+    const rightWallAngle = Math.atan2(endY - startY, (bottomRightX + wallPadding) - (topRightX + wallPadding));
+    const rightWallCx = ((topRightX + wallPadding) + (bottomRightX + wallPadding)) / 2;
+    const rightWallCy = leftWallCy;
+    Matter.Composite.add(engine.world,
+      Matter.Bodies.rectangle(rightWallCx, rightWallCy, leftWallLen, wallThickness, {
+        isStatic: true, angle: rightWallAngle, restitution: 0.3, label: 'wallR',
+      })
+    );
+
+    // Floor + side walls
     const bucketY = endY + gap * 0.65;
     Matter.Composite.add(engine.world, [
-      Matter.Bodies.rectangle(w / 2, bucketY + 35, w * 2, 20, { isStatic: true, label: 'floor', restitution: 0.1 }),
-      Matter.Bodies.rectangle(-15, h / 2, 30, h * 2, { isStatic: true }),
-      Matter.Bodies.rectangle(w + 15, h / 2, 30, h * 2, { isStatic: true }),
+      Matter.Bodies.rectangle(w / 2, bucketY + 40, w * 2, 20, { isStatic: true, label: 'floor', restitution: 0.1 }),
     ]);
 
-    // Bucket dividers — taller to catch balls
+    // Bucket dividers — aligned to bottom row pin positions
+    // rows+1 buckets fit between the (rows+3) bottom pins
+    // Each bucket spans 1 gap between adjacent bottom-row pins
+    // But we have rows+3 pins and rows+1 buckets...
+    // Actually: rows+1 buckets, each between gaps of the bottom row.
+    // Bottom row has rows+3 pins. Buckets sit between pairs of pins.
+    // We need rows+2 gaps between pins, but only rows+1 buckets.
+    // The standard approach: buckets span from pin[0] to pin[last] of bottom row,
+    // divided into rows+1 equal segments.
     const numBuckets = rows + 1;
-    const totalBW = rows * gap;
-    const bw = totalBW / numBuckets;
-    const bsx = (w - totalBW) / 2;
+    const bucketAreaLeft = bottomLeftX;
+    const bucketAreaRight = bottomRightX;
+    const bucketTotalW = bucketAreaRight - bucketAreaLeft;
+    const bw = bucketTotalW / numBuckets;
+
     for (let i = 0; i <= numBuckets; i++) {
       Matter.Composite.add(engine.world,
-        Matter.Bodies.rectangle(bsx + i * bw, bucketY + 8, 3, 36, {
+        Matter.Bodies.rectangle(bucketAreaLeft + i * bw, bucketY + 8, 3, 36, {
           isStatic: true, restitution: 0.2, label: 'divider',
         })
       );
@@ -150,7 +199,7 @@ export default function PlinkoBoard({
     return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Collisions — apply directional bias on pin hit
+  // Collisions
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
@@ -172,11 +221,11 @@ export default function PlinkoBoard({
           sound.pinHit(pinRow / rows);
           pinGlowsRef.current.push({ x: pin.position.x, y: pin.position.y, time: Date.now() });
 
-          // Apply horizontal velocity directly — much more reliable than force
-          const speed = Math.abs(ball.velocity.y) * 0.6 + 0.8;
+          // Set velocity directly for reliable left/right control
+          const hSpeed = Math.max(1.2, Math.abs(ball.velocity.y) * 0.5);
           Matter.Body.setVelocity(ball, {
-            x: dir === 1 ? speed : -speed,
-            y: ball.velocity.y * 0.4 + 0.5, // dampen vertical, keep falling
+            x: dir === 1 ? hSpeed : -hSpeed,
+            y: Math.max(0.5, ball.velocity.y * 0.3),
           });
         }
 
@@ -186,19 +235,19 @@ export default function PlinkoBoard({
           landedRef.current.add(ballId);
 
           const { w } = sizeRef.current;
-          const { gap, endY } = getGeometry(w, sizeRef.current.h);
+          const geo = getGeometry(w, sizeRef.current.h);
           const numBuckets = rows + 1;
-          const totalBW = rows * gap;
-          const bw = totalBW / numBuckets;
-          const bsx = (w - totalBW) / 2;
-          const idx = Math.round((ball.position.x - bsx - bw / 2) / bw);
+          const bucketTotalW = geo.bottomRightX - geo.bottomLeftX;
+          const bw = bucketTotalW / numBuckets;
+          const relX = ball.position.x - geo.bottomLeftX;
+          const idx = Math.floor(relX / bw);
           const clampedIdx = Math.max(0, Math.min(numBuckets - 1, idx));
 
           flashRef.current.set(clampedIdx, Date.now());
           const mult = multipliers[clampedIdx] || 0;
           const color = getMultiplierColor(mult);
-          const bucketTopY = endY + gap * 0.35;
-          const popupX = bsx + clampedIdx * bw + bw / 2;
+          const popupX = geo.bottomLeftX + clampedIdx * bw + bw / 2;
+          const bucketTopY = geo.endY + geo.gap * 0.3;
 
           winPopupsRef.current.push({ x: popupX, y: bucketTopY - 10, mult, time: Date.now(), color });
 
@@ -241,16 +290,11 @@ export default function PlinkoBoard({
       const dirs = paths.get(id) || [];
       const ball = Matter.Bodies.circle(
         w / 2 + (Math.random() - 0.5) * 4,
-        startY - 25,
+        startY - 20,
         BALL_RADIUS,
-        {
-          restitution: 0.4,
-          friction: 0.05,
-          density: 0.003,
-          label: `ball-${id}`,
-        }
+        { restitution: 0.4, friction: 0.05, density: 0.003, label: `ball-${id}` }
       );
-      Matter.Body.setVelocity(ball, { x: 0, y: 1 }); // Small initial downward push
+      Matter.Body.setVelocity(ball, { x: 0, y: 1.5 });
       Matter.Composite.add(engine.world, ball);
       activeBallsRef.current.set(id, { body: ball, row: 0, dirs, trail: [] });
       onBallConsumed(id);
@@ -272,25 +316,25 @@ export default function PlinkoBoard({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
-      // Background
       ctx.fillStyle = '#000514';
       ctx.fillRect(0, 0, w, h);
       drawStoneBackground(ctx, w, h);
 
-      const { pins, gap, endY } = getGeometry(w, h);
+      const geo = getGeometry(w, h);
+      const { pins, gap, endY, bottomLeftX, bottomRightX } = geo;
       const now = Date.now();
 
-      // Pin glows (behind pins)
+      // Pin glows
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       pinGlowsRef.current.forEach(g => {
         const age = (now - g.time) / 250;
         const alpha = (1 - age) * 0.5;
-        const radius = PIN_RADIUS + 8 + age * 5;
-        const grd = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, radius);
+        const r = PIN_RADIUS + 8 + age * 5;
+        const grd = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
         grd.addColorStop(0, `rgba(14, 204, 104, ${alpha})`);
         grd.addColorStop(1, 'rgba(14, 204, 104, 0)');
         ctx.beginPath();
-        ctx.arc(g.x, g.y, radius, 0, Math.PI * 2);
+        ctx.arc(g.x, g.y, r, 0, Math.PI * 2);
         ctx.fillStyle = grd;
         ctx.fill();
       });
@@ -314,22 +358,21 @@ export default function PlinkoBoard({
         ctx.fill();
       });
 
-      // Buckets + labels
+      // Buckets — aligned to bottom row
       const numBuckets = rows + 1;
-      const totalBW = rows * gap;
-      const bw = totalBW / numBuckets;
-      const bsx = (w - totalBW) / 2;
+      const bucketTotalW = bottomRightX - bottomLeftX;
+      const bw = bucketTotalW / numBuckets;
       const bucketTopY = endY + gap * 0.3;
 
       multipliers.forEach((mult, i) => {
-        const x = bsx + i * bw;
+        const x = bottomLeftX + i * bw;
         const color = getMultiplierColor(mult);
         const flashTime = flashRef.current.get(i);
         const isFlashing = flashTime && now - flashTime < 500;
         const flashI = isFlashing ? 1 - (now - flashTime!) / 500 : 0;
         const [bR, bG, bB] = hexToRgb(color);
 
-        // 3D Bucket trapezoid
+        // 3D Bucket
         const cupW = bw - 2;
         const cupH = 24;
         const taper = cupW * 0.1;
@@ -341,7 +384,6 @@ export default function PlinkoBoard({
         ctx.lineTo(x + 1 + cupW - taper, bucketTopY);
         ctx.closePath();
 
-        // Fill
         const fg = ctx.createLinearGradient(x, bucketTopY, x, bucketTopY + cupH);
         fg.addColorStop(0, `rgba(${bR}, ${bG}, ${bB}, ${0.65 + flashI * 0.35})`);
         fg.addColorStop(0.5, `rgba(${bR * 0.5 | 0}, ${bG * 0.5 | 0}, ${bB * 0.5 | 0}, ${0.5 + flashI * 0.3})`);
@@ -349,7 +391,7 @@ export default function PlinkoBoard({
         ctx.fillStyle = fg;
         ctx.fill();
 
-        // Rim highlight
+        // Rim
         ctx.beginPath();
         ctx.moveTo(x + 1 + taper, bucketTopY);
         ctx.lineTo(x + 1 + cupW - taper, bucketTopY);
@@ -357,7 +399,6 @@ export default function PlinkoBoard({
         ctx.strokeStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.8 + flashI * 0.2})`;
         ctx.stroke();
 
-        // Flash glow
         if (isFlashing) {
           ctx.save();
           ctx.shadowColor = color;
@@ -369,7 +410,7 @@ export default function PlinkoBoard({
           ctx.restore();
         }
 
-        // Label below bucket
+        // Label
         const labelY = bucketTopY + cupH + 15;
         const fontSize = bw < 26 ? 7 : bw < 34 ? 8 : bw < 44 ? 9 : 10;
         ctx.font = `bold ${fontSize}px Inter, sans-serif`;
@@ -378,7 +419,6 @@ export default function PlinkoBoard({
         const label = mult >= 1000 ? `${(mult / 1000).toFixed(0)}K` : `${mult}X`;
         const tw = ctx.measureText(label).width;
 
-        // Label pill bg
         ctx.beginPath();
         ctx.roundRect(x + bw / 2 - tw / 2 - 5, labelY - 8, tw + 10, 16, 4);
         ctx.fillStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.15 + flashI * 0.25})`;
@@ -411,25 +451,23 @@ export default function PlinkoBoard({
       activeBallsRef.current.forEach(info => {
         const { body, trail } = info;
         const { x, y } = body.position;
-
         trail.push({ x, y, time: now });
         while (trail.length > 10) trail.shift();
 
-        // Trail
         for (let t = 0; t < trail.length - 1; t++) {
           const dot = trail[t];
           const age = (now - dot.time) / 120;
           if (age > 1) continue;
           const alpha = (1 - age) * 0.2 * (t / trail.length);
-          const size = BALL_RADIUS * (1 - age) * 0.5;
-          if (size <= 0) continue;
+          const sz = BALL_RADIUS * (1 - age) * 0.5;
+          if (sz <= 0) continue;
           ctx.beginPath();
-          ctx.arc(dot.x, dot.y, size, 0, Math.PI * 2);
+          ctx.arc(dot.x, dot.y, sz, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(251, 206, 4, ${alpha})`;
           ctx.fill();
         }
 
-        // Ball glow
+        // Glow
         const glowG = ctx.createRadialGradient(x, y, BALL_RADIUS, x, y, BALL_RADIUS + 14);
         glowG.addColorStop(0, 'rgba(251, 206, 4, 0.25)');
         glowG.addColorStop(1, 'rgba(251, 206, 4, 0)');
@@ -463,17 +501,14 @@ export default function PlinkoBoard({
         const alpha = age < 0.15 ? age / 0.15 : age > 0.65 ? (1 - age) / 0.35 : 1;
         const offsetY = age * 55;
         const scale = 0.7 + Math.sin(age * Math.PI) * 0.35;
-
         ctx.save();
         ctx.translate(p.x, p.y - offsetY);
         ctx.scale(scale, scale);
         ctx.globalAlpha = Math.max(0, alpha);
-
         const text = p.mult >= 1000 ? `${(p.mult / 1000).toFixed(0)}K` : `${p.mult}X`;
         ctx.font = `bold ${p.mult >= 10 ? 16 : 13}px Inter, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
         const tmw = ctx.measureText(text).width;
         ctx.beginPath();
         ctx.roundRect(-tmw / 2 - 8, -11, tmw + 16, 22, 11);
