@@ -2,14 +2,8 @@ import { useEffect } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import { fmt } from '../utils/format';
 
-export const MIN_BET = 0.1;
-export const MAX_BET = 1000;
-
-// BGaming steps the bet through a fixed 1-2-3-5 ladder (observed in the
-// demo: 1 → 2 → 3 → 5 → 10 → 15…) — no free typing.
-const BET_STEPS = [
-  0.1, 0.2, 0.3, 0.5, 1, 2, 3, 5, 10, 15, 20, 30, 50, 100, 150, 200, 300, 500, 1000,
-];
+import { MIN_BET, MAX_BET, BET_STEPS } from '../game/betting';
+export { MIN_BET, MAX_BET };
 
 // Number-of-bets ladder for auto mode ('0' renders as ∞).
 const AUTO_STEPS = ['5', '10', '25', '50', '100', '0'];
@@ -121,12 +115,15 @@ export default function BgControls({
             <span className="play-btn-count">{remaining}</span>
           </button>
         ) : (
-          <button className="play-btn" onClick={onPlay} disabled={bet <= 0 || bet > balance || flightFull}>
+          <button className="play-btn" onClick={onPlay} disabled={flightFull || balance < MIN_BET}>
             <svg className="play-btn-arc" viewBox="0 0 60 20" width="52" height="17" fill="none">
               <path d="M4 16 Q 14 2 26 14 Q 38 26 52 5" stroke="#E9A53C" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="0.1 6.5" />
               <circle cx="53" cy="4.4" r="3.6" fill="#E9375B" />
             </svg>
             <span className="play-btn-label">PLAY</span>
+            {mode === 'auto' && (
+              <span className="play-btn-count">×{autoRounds === '0' ? '∞' : autoRounds}</span>
+            )}
           </button>
         )}
 

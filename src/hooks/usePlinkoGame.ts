@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import { getMultipliers } from '../utils/multipliers';
 import { getPath, randomHex, sha256 } from '../utils/provablyFair';
+import { MIN_BET, clampBetToBalance } from '../game/betting';
 import { sound } from '../utils/sound';
 
 export interface BetResult {
@@ -71,8 +72,24 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
   useEffect(() => { ledgerRef.current = balance; }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { localStorage.setItem('plinko_instant', String(instant)); }, [instant]);
 
+  // Demo refill: a busted balance would permanently brick the PLAY button.
+  useEffect(() => {
+    if (balance < MIN_BET && ballsInFlight === 0 && !autoRunning) {
+      ledgerRef.current = 10000;
+      localStorage.setItem('plinko_balance', '10000');
+      setBalance(10000);
+    }
+  }, [balance, ballsInFlight, autoRunning]);
+
   const drop = useCallback(async (isAuto = false) => {
-    const bet = betRef.current;
+    // If the balance no longer covers the chosen bet, clamp the wager down to
+    // the highest affordable ladder step instead of dead-ending the button.
+    let bet = betRef.current;
+    if (bet > balanceRef.current) {
+      bet = clampBetToBalance(bet, balanceRef.current);
+      setBetStrState(bet.toFixed(2));
+      localStorage.setItem('plinko_bet', bet.toFixed(2));
+    }
     if (balanceRef.current < bet || bet <= 0) return false;
     if (pending.current.size >= MAX_CONCURRENT_BALLS) return false;
     setBalance(p => p - bet);
