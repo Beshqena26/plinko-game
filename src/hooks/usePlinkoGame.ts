@@ -137,11 +137,12 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     maybeShowAutoSummary();
   }, [maybeShowAutoSummary]);
 
-  const startAuto = useCallback(() => {
+  const startAuto = useCallback((roundsOverride?: string) => {
     autoRef.current = true; setAutoRunning(true); setAutoPlayed(0); setAutoProfit(0);
     autoStats.current = { rounds: 0, wins: 0, losses: 0, profit: 0 };
     autoDoneRef.current = false;
-    const limit = autoRounds === '0' ? Infinity : (parseInt(autoRounds) || 10);
+    const rounds = roundsOverride ?? autoRounds;
+    const limit = rounds === '0' ? Infinity : (parseInt(rounds) || 10);
     let c = 0;
     const tick = async () => {
       if (!autoRef.current || c >= limit) { stopAuto(); return; }

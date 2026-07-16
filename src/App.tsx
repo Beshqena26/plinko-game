@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import PlinkoBoard from './components/PlinkoBoard';
 import BgControls from './components/BgControls';
-import { InfoDrawer, PfDrawer, HistoryDrawer, AutoDrawer } from './components/Drawers';
+import type { BetMode } from './components/BgControls';
+import { InfoDrawer, PfDrawer, HistoryDrawer } from './components/Drawers';
 import type { RiskLevel } from './utils/multipliers';
 import { getMultipliers } from './utils/multipliers';
 import { usePlinkoGame } from './hooks/usePlinkoGame';
@@ -46,9 +47,19 @@ export default function App() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [pfOpen, setPfOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
-  const [autoOpen, setAutoOpen] = useState(false);
+  const [mode, setMode] = useState<BetMode>('manual');
 
   const game = usePlinkoGame(rows, risk);
+
+  // BGaming behavior: in Auto mode PLAY starts an endless run; STOP ends it.
+  const onPlay = () => {
+    if (mode === 'auto') {
+      game.setAutoRounds('0');
+      game.startAuto('0');
+    } else {
+      void game.drop();
+    }
+  };
 
   useEffect(() => {
     const tm = setTimeout(() => setLoading(false), 2200);
@@ -57,7 +68,6 @@ export default function App() {
 
   const mults = getMultipliers(risk, rows);
   const handleSoundToggle = () => setSoundOn(sound.toggle());
-  const totalAutoRounds = game.autoRounds === '0' ? '∞' : game.autoRounds;
 
   if (loading) return (
     <div className="loading-screen">
@@ -132,14 +142,14 @@ export default function App() {
               setBetStr={game.setBetStr}
               risk={risk}
               setRisk={setRisk}
+              mode={mode}
+              setMode={setMode}
               autoRunning={game.autoRunning}
               ballsInFlight={game.ballsInFlight}
               autoPlayed={game.autoPlayed}
               autoProfit={game.autoProfit}
-              totalAutoRounds={totalAutoRounds}
-              onDrop={() => { void game.drop(); }}
+              onPlay={onPlay}
               onStopAuto={game.stopAuto}
-              onOpenAuto={() => setAutoOpen(true)}
             />
           </main>
         </div>
@@ -152,12 +162,6 @@ export default function App() {
         setClientSeed={game.setClientSeed} onRotate={game.rotateSeed}
       />
       <HistoryDrawer open={histOpen} onClose={() => setHistOpen(false)} rounds={game.history} />
-      <AutoDrawer
-        open={autoOpen} onClose={() => setAutoOpen(false)}
-        autoRounds={game.autoRounds} setAutoRounds={game.setAutoRounds}
-        bet={game.bet} rows={rows} risk={risk}
-        autoRunning={game.autoRunning} onStart={game.startAuto}
-      />
 
       {game.autoSummary && (
         <div className="modal-overlay show" onClick={() => game.setAutoSummary(null)}>
