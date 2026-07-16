@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import { fmt } from '../utils/format';
 
@@ -38,22 +38,44 @@ export default function BgControls({
 }: Props) {
   const riskLocked = autoRunning || ballsInFlight > 0;
   const bet = Math.max(0, parseFloat(betStr) || 0);
+  const betStrRef = useRef(betStr);
+  betStrRef.current = betStr;
 
+  // Stake hotkeys: Space = bet / stop autobet, A = halve bet, S = double bet.
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement)) {
+      if (e.repeat || e.target instanceof HTMLInputElement) return;
+      if (e.code === 'Space') {
         e.preventDefault();
         if (autoRunning) onStopAuto(); else onDrop();
+      } else if (e.code === 'KeyA' && !autoRunning) {
+        const v = Math.max(0, parseFloat(betStrRef.current) || 0);
+        setBetStr(Math.max(MIN_BET, +(v / 2).toFixed(2)).toFixed(2));
+      } else if (e.code === 'KeyS' && !autoRunning) {
+        const v = Math.max(0, parseFloat(betStrRef.current) || 0);
+        setBetStr(Math.min(MAX_BET, +(v * 2).toFixed(2)).toFixed(2));
       }
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
-  }, [autoRunning, onDrop, onStopAuto]);
+  }, [autoRunning, onDrop, onStopAuto, setBetStr]);
 
   const stepBet = (dir: 1 | -1) => {
     const v = bet;
     const inc = v < 1 || (dir === -1 && v <= 1) ? 0.1 : v < 10 || (dir === -1 && v <= 10) ? 1 : 10;
     setBetStr(Math.max(MIN_BET, Math.min(MAX_BET, v + dir * inc)).toFixed(2));
+  };
+
+  // Stake signature quick actions: halve / double, clamped to the bet limits.
+  const halveBet = () => setBetStr(Math.max(MIN_BET, +(bet / 2).toFixed(2)).toFixed(2));
+  const doubleBet = () => setBetStr(Math.min(MAX_BET, +(bet * 2).toFixed(2)).toFixed(2));
+
+  // Stake formats/clamps the amount when the input loses focus.
+  const normalizeBet = () => {
+    const v = parseFloat(betStr);
+    if (isNaN(v) || v < MIN_BET) setBetStr(MIN_BET.toFixed(2));
+    else if (v > MAX_BET) setBetStr(MAX_BET.toFixed(2));
+    else setBetStr(v.toFixed(2));
   };
 
   return (
@@ -102,6 +124,7 @@ export default function BgControls({
       <div className="bgc-bet-row">
         <div className="bgc-bet-side">
           <button className="bgc-pill" disabled={autoRunning} onClick={() => setBetStr(MIN_BET.toFixed(2))}>Min</button>
+          <button className="bgc-pill" disabled={autoRunning} onClick={halveBet} title="Halve bet">½</button>
           <button className="bgc-pill" disabled={autoRunning} onClick={() => stepBet(-1)}>−</button>
         </div>
         <label className="bgc-bet-display">
@@ -110,10 +133,12 @@ export default function BgControls({
             type="number" value={betStr} min={MIN_BET} max={MAX_BET} step="0.10"
             disabled={autoRunning}
             onChange={e => setBetStr(e.target.value)}
+            onBlur={normalizeBet}
           />
         </label>
         <div className="bgc-bet-side">
           <button className="bgc-pill" disabled={autoRunning} onClick={() => stepBet(1)}>+</button>
+          <button className="bgc-pill" disabled={autoRunning} onClick={doubleBet} title="Double bet">2×</button>
           <button className="bgc-pill" disabled={autoRunning} onClick={() => setBetStr(Math.min(MAX_BET, balance).toFixed(2))}>Max</button>
         </div>
       </div>

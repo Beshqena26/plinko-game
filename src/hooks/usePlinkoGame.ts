@@ -29,7 +29,15 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     const v = parseFloat(localStorage.getItem('plinko_balance') || '');
     return v >= 0.1 ? v : 10000;
   });
-  const [betStr, setBetStr] = useState('1.00');
+  // Bet amount persists across sessions (Stake behavior)
+  const [betStr, setBetStrState] = useState(() => {
+    const v = localStorage.getItem('plinko_bet');
+    return v && !isNaN(parseFloat(v)) ? v : '1.00';
+  });
+  const setBetStr = useCallback((v: string) => {
+    setBetStrState(v);
+    if (!isNaN(parseFloat(v))) localStorage.setItem('plinko_bet', v);
+  }, []);
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoRounds, setAutoRounds] = useState('10'); // '0' = unlimited
   const [autoPlayed, setAutoPlayed] = useState(0);
