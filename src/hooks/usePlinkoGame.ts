@@ -149,7 +149,7 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
       const ok = await drop(true);
       if (!ok) { stopAuto(); return; }
       c++; setAutoPlayed(c);
-      setTimeout(tick, 400);
+      setTimeout(tick, 1050); // BGaming's observed auto cadence (~1.1s/bet)
     };
     tick();
   }, [drop, autoRounds, stopAuto]);

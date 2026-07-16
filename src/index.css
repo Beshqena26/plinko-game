@@ -758,17 +758,44 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .play-btn-label { color: #E9A53C; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
 .play-btn-sub { color: #7E6420; }
+/* STOP state: same white orb, thicker ORANGE ring, orange STOP text with the
+   remaining-bets count beneath (matches BGaming's auto run) */
 .play-btn.stop {
   background:
-    radial-gradient(circle at 36% 30%, #FFD9D8 0%, #F8807E 40%, #EE4B49 75%, #C33230 100%);
+    radial-gradient(circle at 36% 30%, #FFFFFF 0%, #F4F7FA 45%, #D9E4EC 78%, #B8CBD8 100%);
   box-shadow:
-    0 0 0 5px #F3B93B,
-    0 0 0 7px #C88E1D,
+    0 0 0 6px #F07617,
+    0 0 0 8px #FF9A3D,
     0 12px 30px rgba(5, 25, 38, 0.5),
-    inset 0 4px 6px rgba(255,255,255,0.5);
+    inset 0 -6px 14px rgba(150, 175, 195, 0.55),
+    inset 0 4px 6px rgba(255,255,255,0.9);
 }
-.play-btn.stop .play-btn-label { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-.play-btn.stop .play-btn-sub { color: rgba(255,255,255,0.9); }
+.play-btn.stop .play-btn-label { color: #F07617; font-size: 19px; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
+.play-btn-count {
+  color: #F07617; font-size: 15px; font-weight: 800;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+}
+
+/* Win banner (BGaming shows it top-center on every winning landing) */
+.win-banner {
+  position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
+  z-index: 40; pointer-events: none;
+  padding: 9px 34px; border-radius: 12px;
+  background: linear-gradient(180deg, #FFB53D 0%, #F07617 100%);
+  border: 2px solid #FFD98A;
+  box-shadow: 0 8px 30px rgba(240, 118, 23, 0.5), inset 0 2px 0 rgba(255,255,255,0.45);
+  color: #4A2500;
+  font-size: 19px; font-weight: 900; letter-spacing: 0.02em;
+  animation: winBanner 1.8s ease forwards;
+  white-space: nowrap;
+}
+@keyframes winBanner {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(0.85); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.04); }
+  20% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+}
 
 /* Purple bet pills + white bet text */
 .bgc-pill {

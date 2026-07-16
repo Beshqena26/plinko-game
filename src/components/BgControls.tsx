@@ -5,10 +5,10 @@ import { fmt } from '../utils/format';
 export const MIN_BET = 0.1;
 export const MAX_BET = 1000;
 
-// BGaming steps the bet through a fixed ladder — no free typing.
+// BGaming steps the bet through a fixed 1-2-3-5 ladder (observed in the
+// demo: 1 → 2 → 3 → 5 → 10 → 15…) — no free typing.
 const BET_STEPS = [
-  0.1, 0.2, 0.3, 0.4, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5, 7.5, 10, 15, 20,
-  25, 30, 40, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000,
+  0.1, 0.2, 0.3, 0.5, 1, 2, 3, 5, 10, 15, 20, 30, 50, 100, 150, 200, 300, 500, 1000,
 ];
 
 // Number-of-bets ladder for auto mode ('0' renders as ∞).
@@ -29,7 +29,6 @@ interface Props {
   autoRunning: boolean;
   ballsInFlight: number;
   autoPlayed: number;
-  autoProfit: number;
   totalAutoRounds: string;
   onPlay: () => void;
   onStopAuto: () => void;
@@ -57,11 +56,14 @@ const RISKS: { v: RiskLevel; l: string; ico: React.ReactNode }[] = [
 export default function BgControls({
   balance, betStr, setBetStr, risk, setRisk, mode, setMode,
   autoRounds, setAutoRounds,
-  autoRunning, ballsInFlight, autoPlayed, autoProfit, totalAutoRounds,
+  autoRunning, ballsInFlight, autoPlayed, totalAutoRounds,
   onPlay, onStopAuto,
 }: Props) {
-  const riskLocked = autoRunning || ballsInFlight > 0;
+  // BGaming locks the whole cluster while a ball is in flight — one ball at
+  // a time in manual, and everything dims during an auto run.
+  const locked = autoRunning || ballsInFlight > 0;
   const bet = Math.max(0, parseFloat(betStr) || 0);
+  const remaining = totalAutoRounds === '∞' ? '∞' : String(Math.max(0, parseInt(totalAutoRounds) - autoPlayed));
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -100,7 +102,7 @@ export default function BgControls({
                 key={r.v}
                 className={`bgc-opt${risk === r.v ? ' active-mode' : ''}`}
                 onClick={() => setRisk(r.v)}
-                disabled={riskLocked}
+                disabled={locked}
               >
                 <span className="bgc-ico">{r.ico}</span>
                 {r.l}
@@ -112,10 +114,10 @@ export default function BgControls({
         {autoRunning ? (
           <button className="play-btn stop" onClick={onStopAuto}>
             <span className="play-btn-label">STOP</span>
-            <span className="play-btn-sub">{autoPlayed}/{totalAutoRounds} · {autoProfit >= 0 ? '+' : ''}{fmt(autoProfit)}</span>
+            <span className="play-btn-count">{remaining}</span>
           </button>
         ) : (
-          <button className="play-btn" onClick={onPlay} disabled={bet <= 0 || bet > balance}>
+          <button className="play-btn" onClick={onPlay} disabled={bet <= 0 || bet > balance || ballsInFlight > 0}>
             <svg className="play-btn-arc" viewBox="0 0 60 20" width="52" height="17" fill="none">
               <path d="M4 16 Q 14 2 26 14 Q 38 26 52 5" stroke="#E9A53C" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="0.1 6.5" />
               <circle cx="53" cy="4.4" r="3.6" fill="#E9375B" />
@@ -130,7 +132,7 @@ export default function BgControls({
             <button
               className={`bgc-opt${mode === 'manual' ? ' active-mode' : ''}`}
               onClick={() => setMode('manual')}
-              disabled={autoRunning}
+              disabled={locked}
             >
               <span className="bgc-ico"><b style={{ color: '#7C5CD6' }}>M</b></span>
               Manual
@@ -138,7 +140,7 @@ export default function BgControls({
             <button
               className={`bgc-opt${mode === 'auto' ? ' active-mode' : ''}`}
               onClick={() => setMode('auto')}
-              disabled={autoRunning}
+              disabled={locked}
             >
               <span className="bgc-ico"><b style={{ color: '#E9375B' }}>A</b></span>
               Auto
@@ -159,16 +161,16 @@ export default function BgControls({
 
       <div className="bgc-bet-row">
         <div className="bgc-bet-side">
-          <button className="bgc-pill" disabled={autoRunning || bet <= MIN_BET} onClick={() => setBetStr(MIN_BET.toFixed(2))}>Min</button>
-          <button className="bgc-pill" disabled={autoRunning || bet <= MIN_BET} onClick={() => stepBet(-1)}>−</button>
+          <button className="bgc-pill" disabled={locked || bet <= MIN_BET} onClick={() => setBetStr(MIN_BET.toFixed(2))}>Min</button>
+          <button className="bgc-pill" disabled={locked || bet <= MIN_BET} onClick={() => stepBet(-1)}>−</button>
         </div>
         <div className="bgc-bet-display">
           <span>Bet</span>
           <b>{fmt(bet)}</b>
         </div>
         <div className="bgc-bet-side">
-          <button className="bgc-pill" disabled={autoRunning || bet >= MAX_BET} onClick={() => stepBet(1)}>+</button>
-          <button className="bgc-pill" disabled={autoRunning || bet >= MAX_BET} onClick={() => setBetStr(MAX_BET.toFixed(2))}>Max</button>
+          <button className="bgc-pill" disabled={locked || bet >= MAX_BET} onClick={() => stepBet(1)}>+</button>
+          <button className="bgc-pill" disabled={locked || bet >= MAX_BET} onClick={() => setBetStr(MAX_BET.toFixed(2))}>Max</button>
         </div>
       </div>
 

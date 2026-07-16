@@ -48,8 +48,18 @@ export default function App() {
   const [pfOpen, setPfOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
   const [mode, setMode] = useState<BetMode>('manual');
+  const [winBanner, setWinBanner] = useState<{ id: number; pay: number } | null>(null);
 
   const game = usePlinkoGame(rows, risk);
+
+  // BGaming shows a "Win X" banner top-center on every winning landing.
+  const lastRound = game.history[0];
+  useEffect(() => {
+    if (!lastRound || lastRound.pay <= 0) return;
+    setWinBanner({ id: lastRound.id, pay: lastRound.pay });
+    const tm = setTimeout(() => setWinBanner(null), 1800);
+    return () => clearTimeout(tm);
+  }, [lastRound?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // BGaming behavior: in Auto mode PLAY runs "Number of bets" rounds
   // (∞ when set to 0); the STOP orb ends the run early.
@@ -94,6 +104,10 @@ export default function App() {
             <button className="fx-btn" onClick={() => setInfoOpen(true)} title="How to Play"><InfoSVG /></button>
           </div>
         </div>
+
+        {winBanner && (
+          <div className="win-banner" key={winBanner.id}>Win {fmt(winBanner.pay)}</div>
+        )}
 
         <div className="row">
           <main className="main">
@@ -146,7 +160,6 @@ export default function App() {
               autoRunning={game.autoRunning}
               ballsInFlight={game.ballsInFlight}
               autoPlayed={game.autoPlayed}
-              autoProfit={game.autoProfit}
               totalAutoRounds={game.autoRounds === '0' ? '∞' : game.autoRounds}
               onPlay={onPlay}
               onStopAuto={game.stopAuto}
