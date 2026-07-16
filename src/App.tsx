@@ -3,7 +3,7 @@ import PlinkoBoard from './components/PlinkoBoard';
 import BgControls from './components/BgControls';
 import { InfoDrawer, PfDrawer, HistoryDrawer, AutoDrawer } from './components/Drawers';
 import type { RiskLevel } from './utils/multipliers';
-import { getMultipliers, getBucketColor } from './utils/multipliers';
+import { getMultipliers } from './utils/multipliers';
 import { usePlinkoGame } from './hooks/usePlinkoGame';
 import { fmt } from './utils/format';
 import { sound } from './utils/sound';
@@ -43,12 +43,10 @@ export default function App() {
   const [rows, setRows] = useState(16);
   const [risk, setRisk] = useState<RiskLevel>('high');
   const [soundOn, setSoundOn] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [pfOpen, setPfOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
-  const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
 
   const game = usePlinkoGame(rows, risk);
 
@@ -56,13 +54,6 @@ export default function App() {
     const tm = setTimeout(() => setLoading(false), 2200);
     return () => clearTimeout(tm);
   }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const h = () => setMenuOpen(false);
-    document.addEventListener('click', h);
-    return () => document.removeEventListener('click', h);
-  }, [menuOpen]);
 
   const mults = getMultipliers(risk, rows);
   const handleSoundToggle = () => setSoundOn(sound.toggle());
@@ -81,70 +72,46 @@ export default function App() {
 
   return (
     <>
-      <div className={`app${game.autoRunning ? ' auto-running' : ''}`}>
-        <div className="header">
-          <div className="header-left">
-            <div className="game-name">
-              <PlinkoIcon />
-              <span>Plinko</span>
-            </div>
+      <div className={`app bg-scene${game.autoRunning ? ' auto-running' : ''}`}>
+        {/* Floating top layer — BGaming has no header bar */}
+        <div className="fx-top">
+          <div className="fx-title">
+            <PlinkoIcon size={22} />
+            <span>PLINKO</span>
           </div>
-          <div className="header-bal">
-            <span className="header-bal-icon">$</span>
-            <span className="header-bal-value">{game.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          </div>
-          <div className="header-right">
-            <button className="hdr-btn hdr-desktop" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
-            <button className="hdr-btn hdr-desktop" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
-            <button
-              className="hdr-btn hdr-desktop" onClick={() => game.setInstant(v => !v)} title="Instant Bet"
-              style={game.instant ? { color: 'var(--accent)', borderColor: 'var(--accent-border)', background: 'var(--accent-glow)' } : undefined}
-            ><BoltHdrSVG /></button>
-            <button className="hdr-btn hdr-desktop" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
-            <button className="hdr-btn hdr-desktop hdr-info" onClick={() => setInfoOpen(true)} title="How to Play">i</button>
-            <button className="hdr-btn hdr-mobile" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
-            <button className="hdr-btn hdr-mobile hdr-dots" onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} title="Menu">
-              <svg viewBox="0 0 20 12" fill="none" width="16" height="10"><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="6" r="1.5" fill="currentColor"/></svg>
-              {menuOpen && (
-                <div className="dots-menu open" onClick={(e) => e.stopPropagation()}>
-                  <div className="dots-menu-item" onClick={() => { setPfOpen(true); setMenuOpen(false); }}><ShieldSVG /> Fair Play</div>
-                  <div className="dots-menu-item" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}><InfoSVG /> How to Play</div>
-                  <div className="dots-menu-item" onClick={() => { game.setInstant(v => !v); setMenuOpen(false); }}><BoltHdrSVG /> {game.instant ? 'Instant: On' : 'Instant: Off'}</div>
-                  <div className="dots-menu-item" onClick={() => { handleSoundToggle(); setMenuOpen(false); }}><SoundSVG on={soundOn} /> {soundOn ? 'Sound: On' : 'Sound: Off'}</div>
-                </div>
-              )}
-            </button>
+          <div className="fx-actions">
+            <button className="fx-btn" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
+            <button className="fx-btn" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
+            <button className={`fx-btn${game.instant ? ' fx-on' : ''}`} onClick={() => game.setInstant(v => !v)} title="Instant Bet"><BoltHdrSVG /></button>
+            <button className="fx-btn" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
+            <button className="fx-btn" onClick={() => setInfoOpen(true)} title="How to Play"><InfoSVG /></button>
           </div>
         </div>
 
         <div className="row">
           <main className="main">
-            {/* Recent results — Stake practice: chips colored by the landed
-                bucket, newest first, click opens the round history. */}
-            <div className="history-bar">
-              {game.history.length === 0 ? (
-                <span className="history-empty">No games yet</span>
-              ) : game.history.slice(0, 8).map(h => {
-                const color = getBucketColor(h.slot, h.dirs.length + 1);
-                return (
-                  <button
-                    key={h.id}
-                    className="history-chip"
-                    style={{ background: `${color}1a`, color, border: `1px solid ${color}40`, cursor: 'pointer' }}
-                    onClick={() => setHistOpen(true)}
-                    title="Open history"
-                  >
-                    {h.mult.toFixed(2)}x
-                  </button>
-                );
-              })}
+            {/* Desktop bet history table (BGaming, left of the board) */}
+            <div className="fx-hist">
+              <div className="fx-hist-head">
+                <span>Time</span><span>Bet</span><span>Payout</span><span>Profit</span>
+              </div>
+              {game.history.slice(0, 8).map(h => (
+                <button key={h.id} className="fx-hist-row" onClick={() => setHistOpen(true)}>
+                  <span>{new Date(h.time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>{h.bet.toFixed(2)}</span>
+                  <span>{h.pay.toFixed(2)}</span>
+                  <span style={{ color: h.profit >= 0 ? '#46E144' : '#FF7B93' }}>
+                    {h.profit >= 0 ? '+' : ''}{h.profit.toFixed(2)}
+                  </span>
+                </button>
+              ))}
             </div>
 
             <div className="game-area">
               <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
                 ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
 
-              {/* BGaming-style Lines rail: rows selector on the board edge */}
+              {/* Lines rail: rows selector on the board edge */}
               <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
                 <span className="lines-rail-label">Lines</span>
                 {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => (
@@ -158,7 +125,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* BGaming-style control cluster — identical desktop & mobile */}
+            {/* BGaming control cluster — identical desktop & mobile */}
             <BgControls
               balance={game.balance}
               betStr={game.betStr}
@@ -175,17 +142,6 @@ export default function App() {
               onOpenAuto={() => setAutoOpen(true)}
             />
           </main>
-        </div>
-
-        <div className="bottom">
-          <div className="bottom-icons">
-            <div className={`ic${faved ? ' faved' : ''}`} title="Favorite" onClick={() => { const next = !faved; setFaved(next); localStorage.setItem('fav_plinko', String(next)); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill={faved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-            </div>
-          </div>
-          <div className="bottom-logo">MYBC</div>
         </div>
       </div>
 

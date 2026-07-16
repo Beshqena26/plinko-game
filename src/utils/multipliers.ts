@@ -60,31 +60,12 @@ export function slotProbability(rows: number, k: number): number {
   return c / 2 ** rows;
 }
 
-// Stake-style position gradient for the bucket row: hot red at the edges
-// through the brand orange to warm yellow at the center, regardless of the
-// multiplier values in the slot.
-const BUCKET_STOPS: [number, string][] = [
-  [0, '#FFD24D'],   // center
-  [0.45, '#F7931A'],
-  [0.75, '#FF6B44'],
-  [1, '#F8385D'],   // edge
-];
-function hexLerp(a: string, b: string, t: number): string {
-  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
-  return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
-}
+// BGaming Plinko two-tone chips: bright green across the row, vivid yellow
+// for the hot edge slots.
 export function getBucketColor(index: number, count: number): string {
   const center = (count - 1) / 2;
   const t = center === 0 ? 0 : Math.abs(index - center) / center;
-  for (let i = 1; i < BUCKET_STOPS.length; i++) {
-    if (t <= BUCKET_STOPS[i][0]) {
-      const [t0, c0] = BUCKET_STOPS[i - 1];
-      const [t1, c1] = BUCKET_STOPS[i];
-      return hexLerp(c0, c1, (t - t0) / (t1 - t0));
-    }
-  }
-  return BUCKET_STOPS[BUCKET_STOPS.length - 1][1];
+  return t >= 0.78 ? '#F2ED30' : '#46E144';
 }
 
 // MYBC brand heat scale: red at the hot edges, through the accent

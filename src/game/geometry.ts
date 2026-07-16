@@ -34,8 +34,8 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
   // Everything is sized in gap units so the board keeps identical proportions
   // on any screen: (rows-1) gaps of pyramid + 1.2 of spawn room on top +
   // 2.4 for the bucket cups and labels below.
-  const TOP_UNITS = 1.2;
-  const BOTTOM_UNITS = 2.4;
+  const TOP_UNITS = 2.6; // spawn room + entry hole + floating title clearance
+  const BOTTOM_UNITS = 2.2;
   const maxGapW = (w * 0.92) / (bottomSpan + 1);
   const maxGapH = h / (rows - 1 + TOP_UNITS + BOTTOM_UNITS);
   const gap = Math.min(38, maxGapW, maxGapH);

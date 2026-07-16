@@ -108,8 +108,13 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* ===== ROW / MAIN ===== */
 .row { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
 .game-area { flex: 1; min-height: 0; position: relative; }
+/* Wide screens: board sits right of center, history table in the left space
+   (BGaming desktop arrangement) */
+@media (min-width: 1001px) {
+  .game-area { margin-left: 17%; }
+}
 
 /* ===== BGaming-style Lines rail (rows selector on the board edge) ===== */
 .lines-rail {
@@ -619,8 +624,151 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .bottom { display: none; }
   .history-bar { height: 36px; padding: 0 12px; justify-content: flex-start; }
 }
+/* ══════════════════════════════════════════════════════
+   BGaming skin — teal scene, floating controls, purple
+   cards, white/gold PLAY orb (matches the live demo)
+   ══════════════════════════════════════════════════════ */
+.app.bg-scene {
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 8%, rgba(120, 200, 230, 0.22), rgba(120, 200, 230, 0) 70%),
+    linear-gradient(180deg, #1D6A87 0%, #154C64 48%, #0E2A3C 100%);
+}
+.loading-screen {
+  background: linear-gradient(180deg, #1D6A87 0%, #154C64 48%, #0E2A3C 100%);
+}
+
+/* Floating top layer (no header bar, like BGaming) */
+.fx-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+  display: flex; align-items: flex-start; justify-content: flex-end;
+  padding: 14px 16px; pointer-events: none;
+}
+.fx-title {
+  position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px;
+  color: #FFC53D;
+  font-size: 24px; font-weight: 900; letter-spacing: 0.06em;
+  text-shadow: 0 2px 0 #B06E00, 0 4px 10px rgba(0,0,0,0.35);
+}
+.fx-actions { display: flex; gap: 10px; pointer-events: auto; }
+.fx-btn {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: transparent; border: 2px solid rgba(255,255,255,0.9);
+  color: #fff; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+}
+.fx-btn svg { width: 18px; height: 18px; }
+.fx-btn:hover { background: rgba(255,255,255,0.14); }
+.fx-btn.fx-on { background: #FFC53D; border-color: #FFC53D; color: #0E2A3C; }
+
+/* Desktop bet history table, left of the board */
+.fx-hist {
+  position: absolute; left: 3.5%; top: 11%;
+  width: min(370px, 28vw);
+  display: flex; flex-direction: column; gap: 2px;
+  z-index: 20;
+}
+.fx-hist-head {
+  display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.2fr;
+  padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.35);
+  color: #fff; font-size: 14px; font-weight: 700;
+}
+.fx-hist-row {
+  display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.2fr;
+  padding: 5px 10px; border: none; border-radius: 6px;
+  background: transparent; text-align: left; cursor: pointer;
+  color: #CFE4EE; font-size: 12.5px; font-weight: 500;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+  transition: background 0.12s;
+}
+.fx-hist-row:hover { background: rgba(255,255,255,0.08); }
+@media (max-width: 1000px) { .fx-hist { display: none; } }
+
+/* Lines rail — white active chip on translucent list */
+.lines-rail-label { color: #EAF6FC; }
+.lines-rail-btn {
+  background: rgba(10, 44, 62, 0.55);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #DFF1FA;
+}
+.lines-rail-btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); color: #fff; }
+.lines-rail-btn.active { background: #FFFFFF; border-color: #FFFFFF; color: #0E2A3C; font-weight: 800; }
+
+/* Purple control cards */
+.bgc-card {
+  background: rgba(104, 84, 172, 0.72);
+  border: 1px solid rgba(255,255,255,0.14);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(5, 25, 38, 0.35);
+}
+.bgc-card-label { color: #EFE9FF; }
+.bgc-opt {
+  background: rgba(58, 44, 108, 0.92);
+  border: 1px solid transparent;
+  color: #FFFFFF;
+}
+.bgc-opt:hover:not(:disabled) { background: rgba(74, 58, 132, 0.95); }
+.bgc-opt.active-mode {
+  background: rgba(38, 27, 78, 0.95);
+  border-color: rgba(255,255,255,0.35);
+  color: #fff;
+}
+.bgc-opt-ico { background: #E91E8C; }
+.bgc-opt-ico--a { background: #EDEDF5; color: #4d3d85; }
+
+/* White orb with gold ring (BGaming PLAY) */
+.play-btn {
+  background:
+    radial-gradient(circle at 36% 30%, #FFFFFF 0%, #F4F7FA 45%, #D9E4EC 78%, #B8CBD8 100%);
+  color: #E9A53C;
+  box-shadow:
+    0 0 0 5px #F3B93B,
+    0 0 0 7px #C88E1D,
+    0 12px 30px rgba(5, 25, 38, 0.5),
+    inset 0 -6px 14px rgba(150, 175, 195, 0.55),
+    inset 0 4px 6px rgba(255,255,255,0.9);
+}
+.play-btn-label { color: #E9A53C; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
+.play-btn-sub { color: #7E6420; }
+.play-btn.stop {
+  background:
+    radial-gradient(circle at 36% 30%, #FFD9D8 0%, #F8807E 40%, #EE4B49 75%, #C33230 100%);
+  box-shadow:
+    0 0 0 5px #F3B93B,
+    0 0 0 7px #C88E1D,
+    0 12px 30px rgba(5, 25, 38, 0.5),
+    inset 0 4px 6px rgba(255,255,255,0.5);
+}
+.play-btn.stop .play-btn-label { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+.play-btn.stop .play-btn-sub { color: rgba(255,255,255,0.9); }
+
+/* Purple bet pills + white bet text */
+.bgc-pill {
+  background: #5B4A9E;
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #fff;
+}
+.bgc-pill:hover:not(:disabled) { background: #6D5BB5; border-color: rgba(255,255,255,0.25); color: #fff; }
+.bgc-bet-display span { color: #FFFFFF; }
+.bgc-bet-display input {
+  color: #FFFFFF;
+  border-bottom: 1px dashed rgba(255,255,255,0.35);
+}
+.bgc-balance { color: #C9BCE9; }
+.bgc-balance b { color: #FFFFFF; }
+
+/* Bucket tooltip on the teal scene */
+.bucket-tooltip { background: rgba(10, 40, 58, 0.95); border-color: rgba(255,255,255,0.2); }
+
 @media (max-width: 560px) {
   .header { padding: 0 10px; height: 44px; }
+  /* Title docks left so it never collides with the action buttons */
+  .fx-top { justify-content: space-between; align-items: center; padding: 10px 12px; }
+  .fx-title { position: static; transform: none; font-size: 17px; }
+  .fx-btn { width: 36px; height: 36px; }
+  .fx-btn svg { width: 15px; height: 15px; }
+  .fx-actions { gap: 7px; }
   /* Cluster scales down but keeps the identical BGaming arrangement */
   .bgc-main { gap: 8px; }
   .bgc-card { min-width: 96px; padding: 6px; }

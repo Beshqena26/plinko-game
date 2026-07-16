@@ -3,7 +3,7 @@ import { getBucketColor, slotProbability } from '../utils/multipliers';
 import { getGeometry, bucketAt } from '../game/geometry';
 import type { BoardGeometry } from '../game/geometry';
 import {
-  drawBackground, drawPinGlows, drawPins, drawBuckets, drawParticles,
+  drawEntryHole, drawPinGlows, drawPins, drawBuckets, drawParticles,
   drawBall, drawWinPopups, spawnWinParticles,
 } from '../game/render';
 import type { PinGlow, TrailDot, WinPopup, Particle } from '../game/render';
@@ -171,14 +171,14 @@ export default function PlinkoBoard({
       const h = canvas.height / dpr;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, w, h);
-      drawBackground(ctx, w, h);
+      ctx.clearRect(0, 0, w, h); // transparent — the CSS scene shows through
 
       const geo = geometry(w, h);
       const { gap, startY, pinR, ballR } = geo;
       const now = Date.now();
       const bucketTopY = geo.bucketTopY;
 
+      drawEntryHole(ctx, geo, w);
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       drawPinGlows(ctx, pinGlowsRef.current, pinR, now);
       drawPins(ctx, geo, pinGlowsRef.current);
