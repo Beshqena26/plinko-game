@@ -15,28 +15,37 @@ async function hmacSha256(key: string, message: string): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.sign('HMAC', k, enc.encode(message)));
 }
 
-// Stake-style path derivation: an HMAC-SHA256 byte stream keyed by the server
-// seed over "clientSeed:nonce" (extended with a cursor when more than 32 bytes
-// are needed). One byte per row — byte < 128 → left (0), else right (1).
-// Landing slot = number of rights.
+// Stake's exact byte stream: HMAC_SHA256(serverSeed, `${clientSeed}:${nonce}:${round}`),
+// 32 bytes per round, round increments as bytes are consumed.
+async function bytes(serverSeed: string, clientSeed: string, nonce: number, count: number): Promise<number[]> {
+  const out: number[] = [];
+  let round = 0;
+  while (out.length < count) {
+    const block = await hmacSha256(serverSeed, `${clientSeed}:${nonce}:${round}`);
+    for (let i = 0; i < block.length && out.length < count; i++) out.push(block[i]);
+    round += 1;
+  }
+  return out;
+}
+
+// Stake's bytes→float: 4 bytes per float, f = b0/256 + b1/256² + b2/256³ + b3/256⁴ ∈ [0,1).
+function toFloats(b: number[]): number[] {
+  const floats: number[] = [];
+  for (let i = 0; i + 3 < b.length; i += 4) {
+    floats.push(b[i] / 256 + b[i + 1] / 256 ** 2 + b[i + 2] / 256 ** 3 + b[i + 3] / 256 ** 4);
+  }
+  return floats;
+}
+
+// Plinko path — one float per row; direction = floor(float × 2): 0 = LEFT, 1 = RIGHT.
+// Landing slot = number of RIGHTs. Identical to Stake's public verifier, so any
+// third-party Stake verifier reproduces our outcomes from the same seeds.
 export async function getPath(
   serverSeed: string,
   clientSeed: string,
   nonce: number,
   rows: number
 ): Promise<number[]> {
-  const dirs: number[] = [];
-  let cursor = 0;
-  let block: Uint8Array = await hmacSha256(serverSeed, `${clientSeed}:${nonce}:${cursor}`);
-  let offset = 0;
-  for (let i = 0; i < rows; i++) {
-    if (offset >= block.length) {
-      cursor += 1;
-      block = await hmacSha256(serverSeed, `${clientSeed}:${nonce}:${cursor}`);
-      offset = 0;
-    }
-    dirs.push(block[offset] < 128 ? 0 : 1);
-    offset += 1;
-  }
-  return dirs;
+  const b = await bytes(serverSeed, clientSeed, nonce, rows * 4);
+  return toFloats(b).map(f => Math.floor(f * 2));
 }

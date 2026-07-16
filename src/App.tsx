@@ -13,6 +13,10 @@ export interface BetResult {
 }
 
 export interface AutoSummary { rounds: number; wins: number; losses: number; profit: number }
+export interface QueuedBall { id: number; instant: boolean }
+
+// Demo max-profit cap (Stake clips wins to a per-currency cap, never rejects).
+const MAX_PROFIT = 10000;
 
 export const fmt = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -44,10 +48,18 @@ const SoundSVG = ({ on }: { on: boolean }) => (
 const InfoSVG = () => (
   <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><line x1="12" y1="11" x2="12" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="8" r="1" fill="currentColor"/></svg>
 );
+const BoltHdrSVG = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></svg>
+);
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [balance, setBalance] = useState(10000);
+  // Balance persists across refreshes; a wager settles into the ledger at drop
+  // time, so reloading mid-flight loses only the animation, never the payout.
+  const [balance, setBalance] = useState(() => {
+    const v = parseFloat(localStorage.getItem('plinko_balance') || '');
+    return v >= 0.1 ? v : 10000;
+  });
   const [betStr, setBetStr] = useState('1.00');
   const [rows, setRows] = useState(16);
   const [risk, setRisk] = useState<RiskLevel>('high');
@@ -55,7 +67,8 @@ export default function App() {
   const [autoRounds, setAutoRounds] = useState('10'); // '0' = unlimited
   const [autoPlayed, setAutoPlayed] = useState(0);
   const [autoProfit, setAutoProfit] = useState(0);
-  const [ballQueue, setBallQueue] = useState<number[]>([]);
+  const [ballQueue, setBallQueue] = useState<QueuedBall[]>([]);
+  const [instant, setInstant] = useState(() => localStorage.getItem('plinko_instant') === 'true');
   const [paths] = useState(() => new Map<number, number[]>());
   const [history, setHistory] = useState<BetResult[]>([]);
   const [soundOn, setSoundOn] = useState(true);
@@ -85,6 +98,9 @@ export default function App() {
     serverSeed: string; clientSeed: string; seedHash: string;
   }>());
   const [ballsInFlight, setBallsInFlight] = useState(0);
+  const ledgerRef = useRef(0); // settled balance, written at drop time
+  const instantRef = useRef(instant);
+  instantRef.current = instant;
   const balanceRef = useRef(balance);
   balanceRef.current = balance;
   const betRef = useRef(1);
@@ -94,6 +110,9 @@ export default function App() {
     const tm = setTimeout(() => setLoading(false), 2200);
     return () => clearTimeout(tm);
   }, []);
+
+  useEffect(() => { ledgerRef.current = balance; }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { localStorage.setItem('plinko_instant', String(instant)); }, [instant]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -120,7 +139,12 @@ export default function App() {
     pending.current.set(id, { bet, nonce, dirs, slot, mult, serverSeed: s, clientSeed: c, seedHash });
     setBallsInFlight(pending.current.size);
     if (isAuto) autoIds.current.add(id);
-    setBallQueue(p => [...p, id]);
+    // Settle into the persisted ledger NOW — the animation only defers the
+    // on-screen credit. Wins clip to the max-profit cap.
+    const pay = Math.min(+(bet * mult).toFixed(2), bet + MAX_PROFIT);
+    ledgerRef.current = +(ledgerRef.current - bet + pay).toFixed(2);
+    localStorage.setItem('plinko_balance', String(ledgerRef.current));
+    setBallQueue(p => [...p, { id, instant: instantRef.current }]);
     return true;
   }, [rows, risk, paths]);
 
@@ -138,7 +162,7 @@ export default function App() {
     pending.current.delete(ballId);
     setBallsInFlight(pending.current.size);
     const { bet, nonce, dirs, slot, mult, serverSeed: ss, clientSeed: cs, seedHash } = entry;
-    const pay = +(bet * mult).toFixed(2);
+    const pay = Math.min(+(bet * mult).toFixed(2), bet + MAX_PROFIT);
     const profit = pay - bet;
     setBalance(p => p + pay);
     sound.land(mult);
@@ -157,7 +181,7 @@ export default function App() {
     }, ...p].slice(0, 50));
   }, [maybeShowAutoSummary]);
 
-  const onConsumed = useCallback((id: number) => setBallQueue(p => p.filter(x => x !== id)), []);
+  const onConsumed = useCallback((id: number) => setBallQueue(p => p.filter(x => x.id !== id)), []);
 
   const stopAuto = useCallback(() => {
     autoRef.current = false; setAutoRunning(false);
@@ -221,6 +245,10 @@ export default function App() {
           <div className="header-right">
             <button className="hdr-btn hdr-desktop" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
             <button className="hdr-btn hdr-desktop" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
+            <button
+              className="hdr-btn hdr-desktop" onClick={() => setInstant(v => !v)} title="Instant Bet"
+              style={instant ? { color: 'var(--accent)', borderColor: 'var(--accent-border)', background: 'var(--accent-glow)' } : undefined}
+            ><BoltHdrSVG /></button>
             <button className="hdr-btn hdr-desktop" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
             <button className="hdr-btn hdr-desktop hdr-info" onClick={() => setInfoOpen(true)} title="How to Play">i</button>
             <button className="hdr-btn hdr-mobile" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
@@ -230,6 +258,7 @@ export default function App() {
                 <div className="dots-menu open" onClick={(e) => e.stopPropagation()}>
                   <div className="dots-menu-item" onClick={() => { setPfOpen(true); setMenuOpen(false); }}><ShieldSVG /> Fair Play</div>
                   <div className="dots-menu-item" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}><InfoSVG /> How to Play</div>
+                  <div className="dots-menu-item" onClick={() => { setInstant(v => !v); setMenuOpen(false); }}><BoltHdrSVG /> {instant ? 'Instant: On' : 'Instant: Off'}</div>
                   <div className="dots-menu-item" onClick={() => { handleSoundToggle(); setMenuOpen(false); }}><SoundSVG on={soundOn} /> {soundOn ? 'Sound: On' : 'Sound: Off'}</div>
                 </div>
               )}

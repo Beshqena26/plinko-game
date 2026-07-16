@@ -3,19 +3,21 @@ import Matter from 'matter-js';
 import { getBucketColor } from '../utils/multipliers';
 import { sound } from '../utils/sound';
 
+interface QueuedBall { id: number; instant: boolean }
+
 interface PlinkoBoardProps {
   rows: number;
   multipliers: number[];
   onBallLand: (ballId: number) => void;
-  ballQueue: number[];
+  ballQueue: QueuedBall[];
   onBallConsumed: (id: number) => void;
   paths: Map<number, number[]>;
 }
 
 // Radii scale with pin spacing so balls always fit between pins,
 // whatever size the board area gets.
-const pinRadiusFor = (gap: number) => Math.max(2.5, Math.min(4, gap * 0.14));
-const ballRadiusFor = (gap: number) => Math.max(4, Math.min(7, gap * 0.19));
+const pinRadiusFor = (gap: number) => Math.max(2.5, Math.min(4, gap * 0.13));
+const ballRadiusFor = (gap: number) => Math.max(4.5, Math.min(8, gap * 0.22));
 
 interface PinGlow { x: number; y: number; time: number }
 interface TrailDot { x: number; y: number; time: number }
@@ -87,7 +89,8 @@ export default function PlinkoBoard({
 
   // Engine
   useEffect(() => {
-    const engine = Matter.Engine.create({ gravity: { x: 0, y: 1.2, scale: 0.001 } });
+    const engine = Matter.Engine.create({ gravity: { x: 0, y: 1.5, scale: 0.001 } });
+    engine.timing.timeScale = 1.35;
     engineRef.current = engine;
     const runner = Matter.Runner.create({ delta: 1000 / 60 });
     runnerRef.current = runner;
@@ -229,10 +232,10 @@ export default function PlinkoBoard({
           pinGlowsRef.current.push({ x: pin.position.x, y: pin.position.y, time: Date.now() });
 
           // Set velocity directly for reliable left/right control
-          const hSpeed = Math.max(1.2, Math.abs(ball.velocity.y) * 0.5);
+          const hSpeed = Math.max(1.6, Math.abs(ball.velocity.y) * 0.5);
           Matter.Body.setVelocity(ball, {
             x: dir === 1 ? hSpeed : -hSpeed,
-            y: Math.max(0.5, ball.velocity.y * 0.3),
+            y: Math.max(1.8, ball.velocity.y * 0.45),
           });
         }
 
@@ -295,10 +298,36 @@ export default function PlinkoBoard({
     const engine = engineRef.current;
     if (!engine) return;
     const { w, h } = sizeRef.current;
-    const { startY, ballR } = getGeometry(w, h);
+    const geo = getGeometry(w, h);
+    const { startY, ballR, endY, gap, bottomLeftX, bottomRightX } = geo;
 
-    ballQueue.forEach(id => {
+    ballQueue.forEach(({ id, instant }) => {
       const dirs = paths.get(id) || [];
+      const targetSlot = dirs.reduce((a, b) => a + b, 0);
+
+      // Instant Bet: no physics — flash the bucket and settle immediately.
+      // The result already exists before rendering, so skipping the animation
+      // cannot change the payout by construction.
+      if (instant) {
+        if (!landedRef.current.has(id)) {
+          landedRef.current.add(id);
+          const numBuckets = multipliers.length;
+          const bw = (bottomRightX - bottomLeftX) / numBuckets;
+          const now = Date.now();
+          flashRef.current.set(targetSlot, now);
+          const mult = multipliers[targetSlot] || 0;
+          winPopupsRef.current.push({
+            x: bottomLeftX + (targetSlot + 0.5) * bw,
+            y: endY + gap * 0.3 - 10,
+            mult, time: now,
+            color: getBucketColor(targetSlot, numBuckets),
+          });
+          onBallLand(id);
+        }
+        onBallConsumed(id);
+        return;
+      }
+
       const ball = Matter.Bodies.circle(
         w / 2 + (Math.random() - 0.5) * 4,
         startY - 20,
@@ -307,12 +336,11 @@ export default function PlinkoBoard({
       );
       Matter.Body.setVelocity(ball, { x: 0, y: 1.5 });
       Matter.Composite.add(engine.world, ball);
-      const targetSlot = dirs.reduce((a, b) => a + b, 0);
       activeBallsRef.current.set(id, { body: ball, row: 0, dirs, targetSlot, trail: [], stuck: 0 });
       onBallConsumed(id);
       sound.drop();
     });
-  }, [ballQueue, paths, onBallConsumed, getGeometry]);
+  }, [ballQueue, paths, multipliers, onBallConsumed, onBallLand, getGeometry]);
 
   // Render
   useEffect(() => {
@@ -490,8 +518,8 @@ export default function PlinkoBoard({
           const numBuckets = multipliers.length;
           const bw = (bottomRightX - bottomLeftX) / numBuckets;
           const targetX = bottomLeftX + (info.targetSlot + 0.5) * bw;
-          const pull = Math.max(-3, Math.min(3, (targetX - x) * 0.08));
-          Matter.Body.setVelocity(body, { x: pull, y: Math.max(body.velocity.y, 1.2) });
+          const pull = Math.max(-3.5, Math.min(3.5, (targetX - x) * 0.1));
+          Matter.Body.setVelocity(body, { x: pull, y: Math.max(body.velocity.y, 2.2) });
         }
         trail.push({ x, y, time: now });
         while (trail.length > 10) trail.shift();

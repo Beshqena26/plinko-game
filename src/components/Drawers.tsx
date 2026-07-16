@@ -22,7 +22,7 @@ const CheckSVG = () => (
   <svg viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3.5 3.5L13 5" stroke="#0ECC68" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
 
-const PLINKO_OUTCOME_MAPPING = 'path = SHA-256(server:client:nonce) · bit i of hash → ball bounces left (0) or right (1) at row i';
+const PLINKO_OUTCOME_MAPPING = 'bytes = HMAC-SHA256(server, "client:nonce:round") · float = 4 bytes/256ᵏ · dir = ⌊float×2⌋ (0=L, 1=R) · slot = # of rights';
 
 interface DrawerShellProps {
   open: boolean;
