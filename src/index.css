@@ -152,6 +152,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .bgc-main {
   display: flex; align-items: flex-start; justify-content: center;
   gap: 14px;
+  /* Reserve the tallest state (Auto mode with the Number-of-bets stepper) so
+     toggling modes never grows the cluster and reflows the board above. */
+  min-height: 150px;
 }
 .bgc-main .play-btn { align-self: center; margin-top: 12px; }
 .play-btn-arc { margin-bottom: -4px; }
@@ -824,7 +827,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .fx-btn svg { width: 15px; height: 15px; }
   .fx-actions { gap: 7px; }
   /* Cluster scales down but keeps the identical BGaming arrangement */
-  .bgc-main { gap: 8px; }
+  .bgc-main { gap: 8px; min-height: 144px; }
   .bgc-card { min-width: 96px; padding: 6px; }
   .bgc-opt { height: 25px; font-size: 11px; padding: 0 7px; }
   .play-btn { width: 86px; height: 86px; }
