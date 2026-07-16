@@ -9,6 +9,10 @@ export interface BoardGeometry {
   bottomRightX: number;
   topLeftX: number;
   topRightX: number;
+  /* Bucket row: rows+1 slots of width exactly `gap`, centered under the inner
+     gaps of the bottom pin row — the only positions a ball can land in. */
+  bucketLeftX: number;
+  bucketRightX: number;
   pinR: number;
   ballR: number;
 }
@@ -52,8 +56,14 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
   const topLeftX = (w - topTotalW) / 2;
   const topRightX = topLeftX + topTotalW;
 
+  // A ball with k rights lands at x = w/2 + (k − rows/2)·gap, so the rows+1
+  // buckets each span one gap, one gap inset from the bottom row's edges.
+  const bucketLeftX = w / 2 - ((rows + 1) / 2) * gap;
+  const bucketRightX = bucketLeftX + (rows + 1) * gap;
+
   return {
     gap, startY, endY, pins, bottomLeftX, bottomRightX, topLeftX, topRightX,
+    bucketLeftX, bucketRightX,
     pinR: pinRadiusFor(gap), ballR: ballRadiusFor(gap),
   };
 }
@@ -62,7 +72,6 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
 export function bucketAt(geo: BoardGeometry, numBuckets: number, x: number, y: number): number | null {
   const bucketTopY = geo.endY + geo.gap * 0.3;
   if (y < bucketTopY - 4 || y > bucketTopY + 55) return null;
-  const bw = (geo.bottomRightX - geo.bottomLeftX) / numBuckets;
-  const i = Math.floor((x - geo.bottomLeftX) / bw);
+  const i = Math.floor((x - geo.bucketLeftX) / geo.gap);
   return i >= 0 && i < numBuckets ? i : null;
 }

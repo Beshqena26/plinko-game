@@ -51,9 +51,8 @@ function bouncePin(geo: BoardGeometry, w: number, dirs: number[], r: number) {
   return { x: sx + col * geo.gap, y: geo.startY + r * geo.gap };
 }
 
-function bucketCenterX(geo: BoardGeometry, numBuckets: number, slot: number) {
-  const bw = (geo.bottomRightX - geo.bottomLeftX) / numBuckets;
-  return geo.bottomLeftX + (slot + 0.5) * bw;
+function bucketCenterX(geo: BoardGeometry, slot: number) {
+  return geo.bucketLeftX + (slot + 0.5) * geo.gap;
 }
 
 export default function PlinkoBoard({
@@ -120,7 +119,7 @@ export default function PlinkoBoard({
     flashRef.current.set(targetSlot, now);
     const mult = multipliers[targetSlot] || 0;
     const color = getBucketColor(targetSlot, numBuckets);
-    const popupX = bucketCenterX(geo, numBuckets, targetSlot);
+    const popupX = bucketCenterX(geo, targetSlot);
     const bucketTopY = geo.endY + geo.gap * 0.3;
     winPopupsRef.current.push({ x: popupX, y: bucketTopY - 10, mult, time: now, color });
     spawnWinParticles(particlesRef.current, popupX, bucketTopY, mult, color);
@@ -178,7 +177,6 @@ export default function PlinkoBoard({
       const geo = geometry(w, h);
       const { gap, startY, endY, pinR, ballR } = geo;
       const now = Date.now();
-      const numBuckets = multipliers.length;
       const bucketTopY = endY + gap * 0.3;
 
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
@@ -234,7 +232,7 @@ export default function PlinkoBoard({
         } else {
           const a = bouncePin(geo, w, ball.dirs, ball.dirs.length - 1);
           x0 = a.x; y0 = a.y - ballR - pinR;
-          x1 = bucketCenterX(geo, numBuckets, ball.targetSlot) + ball.jitter * 0.5;
+          x1 = bucketCenterX(geo, ball.targetSlot) + ball.jitter * 0.5;
           y1 = bucketTopY + 10;
           arc = gap * 0.3;
         }

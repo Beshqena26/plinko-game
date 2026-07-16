@@ -75,13 +75,13 @@ export function drawBuckets(
   hovered: number | null,
   now: number,
 ) {
-  const { gap, endY, bottomLeftX, bottomRightX } = geo;
+  const { gap, endY, bucketLeftX } = geo;
   const numBuckets = multipliers.length;
-  const bw = (bottomRightX - bottomLeftX) / numBuckets;
+  const bw = gap; // one bucket per landing position, aligned to the pin grid
   const bucketTopY = endY + gap * 0.3;
 
   multipliers.forEach((mult, i) => {
-    const x = bottomLeftX + i * bw;
+    const x = bucketLeftX + i * bw;
     const color = getBucketColor(i, numBuckets);
     const flashTime = flash.get(i);
     const isFlashing = flashTime && now - flashTime < 500;
