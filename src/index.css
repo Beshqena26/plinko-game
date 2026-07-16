@@ -125,8 +125,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* ===== HISTORY BAR ===== */
 .history-bar {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 10px 16px;
-  overflow-x: auto; flex-shrink: 0;
+  height: 44px; /* fixed — chips appearing must never reflow the board below */
+  padding: 0 16px;
+  overflow-x: auto; overflow-y: hidden; flex-shrink: 0;
 }
 .history-bar::-webkit-scrollbar { display: none; }
 .history-empty { font-size: 11px; color: var(--text-dim); white-space: nowrap; font-weight: 500; }
@@ -564,7 +565,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .hdr-desktop { display: none; }
   .hdr-mobile { display: flex; }
   .bottom { display: none; }
-  .history-bar { padding: 6px 12px; justify-content: flex-start; }
+  .history-bar { height: 36px; padding: 0 12px; justify-content: flex-start; }
 }
 @media (max-width: 560px) {
   .header { padding: 0 10px; height: 44px; }

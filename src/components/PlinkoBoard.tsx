@@ -85,15 +85,17 @@ export default function PlinkoBoard({
     flashRef.current.clear();
   }, [rows]);
 
-  // Resize
+  // Resize — observe the parent element, not just the window, so any layout
+  // change around the board (drawers, bars, font loading) re-measures the
+  // canvas instead of shifting it.
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const parent = canvas?.parentElement;
+    if (!canvas || !parent) return;
     const resize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
       const dpr = window.devicePixelRatio || 1;
       const rect = parent.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       canvas.style.width = `${rect.width}px`;
@@ -101,8 +103,13 @@ export default function PlinkoBoard({
       sizeRef.current = { w: rect.width, h: rect.height };
     };
     resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(parent);
     window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', resize);
+    };
   }, []);
 
   const settle = useCallback((id: number, targetSlot: number) => {
