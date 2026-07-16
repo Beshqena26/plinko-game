@@ -4,12 +4,15 @@ import SidePanel from './components/SidePanel';
 import { InfoDrawer, PfDrawer, HistoryDrawer, AutoDrawer } from './components/Drawers';
 import type { RiskLevel } from './utils/multipliers';
 import { getMultipliers } from './utils/multipliers';
-import { getPath, randomHex } from './utils/provablyFair';
+import { getPath, randomHex, sha256 } from './utils/provablyFair';
 import { sound } from './utils/sound';
 
 export interface BetResult {
   id: number; mult: number; profit: number; bet: number; pay: number; time: number; nonce: number;
+  serverSeed: string; clientSeed: string; seedHash: string; dirs: number[]; slot: number;
 }
+
+export interface AutoSummary { rounds: number; wins: number; losses: number; profit: number }
 
 export const fmt = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -61,6 +64,7 @@ export default function App() {
   const [pfOpen, setPfOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
+  const [autoSummary, setAutoSummary] = useState<AutoSummary | null>(null);
   const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
 
   const idRef = useRef(0);
@@ -71,7 +75,11 @@ export default function App() {
   seedRef.current = { s: serverSeed, c: clientSeed };
   const autoRef = useRef(false);
   const autoIds = useRef(new Set<number>());
-  const pending = useRef(new Map<number, { bet: number; nonce: number }>());
+  const autoStats = useRef<AutoSummary>({ rounds: 0, wins: 0, losses: 0, profit: 0 });
+  const autoDoneRef = useRef(false);
+  const pending = useRef(new Map<number, {
+    bet: number; nonce: number; dirs: number[]; serverSeed: string; clientSeed: string; seedHash: string;
+  }>());
   const balanceRef = useRef(balance);
   balanceRef.current = balance;
   const betRef = useRef(1);
@@ -97,37 +105,62 @@ export default function App() {
     setBalance(p => p - bet);
     const id = ++idRef.current;
     const nonce = ++nonceRef.current;
-    const dirs = await getPath(seedRef.current.s, seedRef.current.c, nonce, rows);
+    const { s, c } = seedRef.current;
+    const dirs = await getPath(s, c, nonce, rows);
+    const seedHash = await sha256(s);
     paths.set(id, dirs);
-    pending.current.set(id, { bet, nonce });
+    pending.current.set(id, { bet, nonce, dirs, serverSeed: s, clientSeed: c, seedHash });
     if (isAuto) autoIds.current.add(id);
     setBallQueue(p => [...p, id]);
     return true;
   }, [rows, paths]);
+
+  // Auto summary appears once the run has ended AND its last ball has landed.
+  const maybeShowAutoSummary = useCallback(() => {
+    if (autoDoneRef.current && autoIds.current.size === 0 && autoStats.current.rounds > 0) {
+      autoDoneRef.current = false;
+      setAutoSummary({ ...autoStats.current });
+    }
+  }, []);
 
   const onLand = useCallback((idx: number) => {
     const m = getMultipliers(risk, rows)[idx];
     if (m == null) return;
     const e = Array.from(pending.current.entries());
     if (!e.length) return;
-    const [bid, { bet, nonce }] = e[0];
+    const [bid, { bet, nonce, dirs, serverSeed: ss, clientSeed: cs, seedHash }] = e[0];
     pending.current.delete(bid);
     const pay = +(bet * m).toFixed(2);
+    const profit = pay - bet;
     setBalance(p => p + pay);
     sound.land(m);
     if (autoIds.current.has(bid)) {
       autoIds.current.delete(bid);
-      setAutoProfit(p => +(p + pay - bet).toFixed(2));
+      const st = autoStats.current;
+      st.rounds += 1;
+      if (profit >= 0) st.wins += 1; else st.losses += 1;
+      st.profit = +(st.profit + profit).toFixed(2);
+      setAutoProfit(st.profit);
+      maybeShowAutoSummary();
     }
-    setHistory(p => [{ id: bid, mult: m, profit: pay - bet, bet, pay, time: Date.now(), nonce }, ...p].slice(0, 50));
-  }, [risk, rows]);
+    setHistory(p => [{
+      id: bid, mult: m, profit, bet, pay, time: Date.now(), nonce,
+      serverSeed: ss, clientSeed: cs, seedHash, dirs, slot: idx,
+    }, ...p].slice(0, 50));
+  }, [risk, rows, maybeShowAutoSummary]);
 
   const onConsumed = useCallback((id: number) => setBallQueue(p => p.filter(x => x !== id)), []);
 
-  const stopAuto = useCallback(() => { autoRef.current = false; setAutoRunning(false); }, []);
+  const stopAuto = useCallback(() => {
+    autoRef.current = false; setAutoRunning(false);
+    autoDoneRef.current = true;
+    maybeShowAutoSummary();
+  }, [maybeShowAutoSummary]);
 
   const startAuto = useCallback(() => {
     autoRef.current = true; setAutoRunning(true); setAutoPlayed(0); setAutoProfit(0);
+    autoStats.current = { rounds: 0, wins: 0, losses: 0, profit: 0 };
+    autoDoneRef.current = false;
     const total = parseInt(autoRounds) || (autoRounds === '0' ? Infinity : 10);
     const limit = autoRounds === '0' ? Infinity : total;
     let c = 0;
@@ -260,6 +293,30 @@ export default function App() {
         bet={betRef.current} rows={rows} risk={risk}
         autoRunning={autoRunning} onStart={startAuto}
       />
+
+      {autoSummary && (
+        <div className="modal-overlay show" onClick={() => setAutoSummary(null)}>
+          <div className="modal free-bet-summary" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setAutoSummary(null)}>&times;</button>
+            <div className={`fbs-icon ${autoSummary.profit >= 0 ? 'fbs-icon-win' : 'fbs-icon-lose'}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
+            <h2>Auto Play Complete</h2>
+            <div className="fbs-stats fbs-stats-3">
+              <div className="fbs-stat"><span className="fbs-stat-label">Rounds</span><span className="fbs-stat-val">{autoSummary.rounds}</span></div>
+              <div className="fbs-stat"><span className="fbs-stat-label">Wins</span><span className="fbs-stat-val" style={{ color: 'var(--green)' }}>{autoSummary.wins}</span></div>
+              <div className="fbs-stat"><span className="fbs-stat-label">Losses</span><span className="fbs-stat-val" style={{ color: 'var(--red)' }}>{autoSummary.losses}</span></div>
+            </div>
+            <div className={`fbs-winnings ${autoSummary.profit >= 0 ? 'fbs-win' : 'fbs-lose'}`}>
+              <span className="fbs-winnings-label">Net Profit</span>
+              <span className="fbs-winnings-val" style={{ color: autoSummary.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                {autoSummary.profit >= 0 ? '+' : ''}{fmt(autoSummary.profit)}
+              </span>
+            </div>
+            <button className="fbs-btn" onClick={() => setAutoSummary(null)}>Continue Playing</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -15,7 +15,7 @@ interface PlinkoBoardProps {
 // Radii scale with pin spacing so balls always fit between pins,
 // whatever size the board area gets.
 const pinRadiusFor = (gap: number) => Math.max(2.5, Math.min(4, gap * 0.14));
-const ballRadiusFor = (gap: number) => Math.max(4.5, Math.min(7, gap * 0.24));
+const ballRadiusFor = (gap: number) => Math.max(4, Math.min(7, gap * 0.19));
 
 interface PinGlow { x: number; y: number; time: number }
 interface TrailDot { x: number; y: number; time: number }
@@ -34,7 +34,7 @@ export default function PlinkoBoard({
   const engineRef = useRef<Matter.Engine | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
   const renderLoopRef = useRef<number>(0);
-  const activeBallsRef = useRef<Map<number, { body: Matter.Body; row: number; dirs: number[]; trail: TrailDot[] }>>(new Map());
+  const activeBallsRef = useRef<Map<number, { body: Matter.Body; row: number; dirs: number[]; trail: TrailDot[]; stuck: number }>>(new Map());
   const flashRef = useRef<Map<number, number>>(new Map());
   const sizeRef = useRef({ w: 0, h: 0 });
   const landedRef = useRef<Set<number>>(new Set());
@@ -301,7 +301,7 @@ export default function PlinkoBoard({
       );
       Matter.Body.setVelocity(ball, { x: 0, y: 1.5 });
       Matter.Composite.add(engine.world, ball);
-      activeBallsRef.current.set(id, { body: ball, row: 0, dirs, trail: [] });
+      activeBallsRef.current.set(id, { body: ball, row: 0, dirs, trail: [], stuck: 0 });
       onBallConsumed(id);
       sound.drop();
     });
@@ -456,6 +456,18 @@ export default function PlinkoBoard({
       activeBallsRef.current.forEach(info => {
         const { body, trail } = info;
         const { x, y } = body.position;
+
+        // Anti-stuck watchdog: a ball wedged on pins/dividers/another ball
+        // stops moving — nudge it back into play so every drop resolves.
+        if (body.speed < 0.2) {
+          info.stuck += 1;
+          if (info.stuck > 40) {
+            Matter.Body.setVelocity(body, { x: (Math.random() - 0.5) * 1.5, y: 2.5 });
+            info.stuck = 0;
+          }
+        } else {
+          info.stuck = 0;
+        }
         trail.push({ x, y, time: now });
         while (trail.length > 10) trail.shift();
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { BetResult } from '../App';
 import { fmt } from '../App';
 import type { RiskLevel } from '../utils/multipliers';
-import { sha256, randomHex } from '../utils/provablyFair';
+import { sha256, randomHex, getPath } from '../utils/provablyFair';
 import { MIN_BET, MAX_BET } from './SidePanel';
 
 const CloseSVG = () => (
@@ -235,8 +235,53 @@ export function PfDrawer({ open, onClose, serverSeed, clientSeed, setClientSeed,
   );
 }
 
-/* ===== HistoryDrawer ===== */
+/* ===== HistoryDrawer — expandable rounds + verify flow (limbo parity) ===== */
+const ShieldSVG = () => (
+  <svg viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2"/></svg>
+);
+const ChevDownSVG = () => (
+  <svg viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="#8B8BA3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+const ChevUpSVG = () => (
+  <svg viewBox="0 0 16 16" fill="none"><path d="M4 10l4-4 4 4" stroke="#8B8BA3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+
+type VerifyState = 'loading' | 'ok' | 'fail' | undefined;
+interface VerifyDataEntry {
+  commit: 'ok' | 'fail';
+  computedHash: string;
+  repro: { path: string; slot: number; pathMatch: boolean } | null;
+}
+
 export function HistoryDrawer({ open, onClose, rounds }: { open: boolean; onClose: () => void; rounds: BetResult[] }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [verifying, setVerifying] = useState<Record<number, VerifyState>>({});
+  const [verifyData, setVerifyData] = useState<Record<number, VerifyDataEntry>>({});
+
+  const toggle = (id: number) => setExpanded(prev => prev === id ? null : id);
+
+  const verify = async (r: BetResult) => {
+    setVerifying(prev => ({ ...prev, [r.id]: 'loading' }));
+    // 1) Commitment check — the server seed must hash to the pre-round commitment.
+    let commit: 'ok' | 'fail' = 'fail', computedHash = '';
+    try {
+      computedHash = await sha256(r.serverSeed);
+      commit = computedHash === r.seedHash ? 'ok' : 'fail';
+    } catch { commit = 'fail'; }
+    // 2) Full reproduction — re-derive the drop path from the seeds and compare
+    //    it (and the landing slot) with what was recorded for the round.
+    let repro: VerifyDataEntry['repro'] = null;
+    try {
+      const dirs = await getPath(r.serverSeed, r.clientSeed, r.nonce, r.dirs.length);
+      const slot = dirs.reduce((a, b) => a + b, 0);
+      const pathMatch = dirs.length === r.dirs.length && dirs.every((d, i) => d === r.dirs[i]);
+      repro = { path: dirs.map(d => (d === 1 ? 'R' : 'L')).join(' '), slot, pathMatch };
+      if (!pathMatch) commit = 'fail';
+    } catch { repro = null; }
+    setVerifyData(prev => ({ ...prev, [r.id]: { commit, computedHash, repro } }));
+    setVerifying(prev => ({ ...prev, [r.id]: commit }));
+  };
+
   return (
     <DrawerShell open={open} onClose={onClose} title="History">
       {rounds.length === 0 && <div className="hist-empty">No rounds played yet</div>}
@@ -245,14 +290,19 @@ export function HistoryDrawer({ open, onClose, rounds }: { open: boolean; onClos
           {rounds.map(r => {
             const isWin = r.profit >= 0;
             const time = new Date(r.time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            const vState = verifying[r.id];
+            const vd = verifyData[r.id];
+            const mono: React.CSSProperties = { fontSize: 10, wordBreak: 'break-all', fontFamily: 'monospace', lineHeight: 1.4 };
+            const lbl: React.CSSProperties = { fontSize: 10, opacity: 0.55, textTransform: 'uppercase', letterSpacing: '.04em' };
+            const sep: React.CSSProperties = { marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.07)' };
             return (
-              <div key={r.id} className="hist-item">
+              <div key={r.id} className={`hist-item ${isWin ? 'hist-win' : 'hist-lose'}`} onClick={() => toggle(r.id)}>
                 <div className="hist-header">
                   <div className="hist-left">
                     <div className={`hist-icon ${isWin ? 'hist-icon-win' : 'hist-icon-lose'}`}>{isWin ? <WinSVG /> : <LoseSVG />}</div>
                     <div className="hist-info">
-                      <span className="hist-info-title">{isWin ? 'Win' : 'Lose'}</span>
-                      <span className="hist-info-sub">{fmt(r.bet)} &middot; {time} &middot; #{r.nonce}</span>
+                      <span className="hist-info-title">{isWin ? 'Win' : 'Loss'}</span>
+                      <span className="hist-info-sub">Bet {fmt(r.bet)} &middot; {time}</span>
                     </div>
                   </div>
                   <div className="hist-right">
@@ -262,8 +312,65 @@ export function HistoryDrawer({ open, onClose, rounds }: { open: boolean; onClos
                         {isWin ? '+ ' : '- '}{fmt(Math.abs(r.profit))}
                       </span>
                     </div>
+                    <div className="hist-chevron">{expanded === r.id ? <ChevUpSVG /> : <ChevDownSVG />}</div>
                   </div>
                 </div>
+                {expanded === r.id && (
+                  <div className="hist-details"><div className="hist-details-inner">
+                    <div className="hist-seeds">
+                      <div className="hist-seed-group"><span className="hist-seed-label">Server Seed</span><span className="hist-seed-value">{r.serverSeed}</span></div>
+                      <div className="hist-seed-group"><span className="hist-seed-label">Seed Hash</span><span className="hist-seed-value">{r.seedHash}</span></div>
+                      <div className="hist-seed-group"><span className="hist-seed-label">Client Seed</span><span className="hist-seed-value">{r.clientSeed}</span></div>
+                      <div className="hist-seed-group"><span className="hist-seed-label">Nonce</span><span className="hist-seed-value">{r.nonce}</span></div>
+                      <div className="hist-seed-group"><span className="hist-seed-label">Round ID</span><span className="hist-seed-value">#{r.id}</span></div>
+                    </div>
+                    <button
+                      className="hist-verify-btn"
+                      onClick={e => { e.stopPropagation(); void verify(r); }}
+                      disabled={vState === 'loading' || vState === 'ok' || vState === 'fail'}
+                      style={vState === 'ok'
+                        ? { background: 'var(--green-bg)', borderColor: 'rgba(14,204,104,0.3)', color: 'var(--green)' }
+                        : vState === 'fail'
+                          ? { background: 'var(--red-bg)', borderColor: 'rgba(248,95,93,0.3)', color: 'var(--red)' }
+                          : {}}
+                    >
+                      {vState === 'ok' ? <CheckSVG /> : vState === 'fail' ? <LoseSVG /> : <ShieldSVG />}
+                      {' '}{vState === 'ok' ? 'Verified' : vState === 'fail' ? 'Mismatch' : vState === 'loading' ? 'Verifying…' : 'Verify Round'}
+                    </button>
+                    {vd && (vState === 'ok' || vState === 'fail') && (() => {
+                      const ok = vState === 'ok';
+                      const fcol = ok ? 'var(--green)' : 'var(--red)';
+                      return (
+                        <div style={{ marginTop: 6, padding: '10px 12px', borderRadius: 10, background: ok ? 'var(--green-bg)' : 'var(--red-bg)', border: '1px solid ' + (ok ? 'rgba(14,204,104,0.3)' : 'rgba(248,95,93,0.3)') }} onClick={e => e.stopPropagation()}>
+                          <div style={{ fontWeight: 700, fontSize: 12, color: fcol }}>{ok ? (vd.repro ? 'Round verified' : 'Commitment verified') : 'Verification failed'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-mid)', marginTop: 2 }}>
+                            {ok ? (vd.repro ? 'The seed hash and the replayed drop path both match.' : 'The server seed hashes to the committed value.') : 'The recorded values do not match the recomputation.'}
+                          </div>
+                          <div style={sep}>
+                            <div style={lbl}>Committed before the round</div>
+                            <div style={mono}>{r.seedHash}</div>
+                            <div style={{ ...lbl, marginTop: 6 }}>SHA-256 of server seed</div>
+                            <div style={{ ...mono, color: fcol }}>{vd.computedHash || '—'}</div>
+                          </div>
+                          {vd.repro && (
+                            <div style={sep}>
+                              <div style={lbl}>Drop path replayed from seeds</div>
+                              <div style={{ ...mono, color: 'var(--text-75)', marginTop: 2 }}>{vd.repro.path}</div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, marginTop: 6 }}>
+                                <span style={{ opacity: 0.7 }}>Landing slot</span>
+                                <span>#{vd.repro.slot} &middot; {r.mult.toFixed(2)}x {vd.repro.pathMatch ? <span style={{ color: 'var(--green)' }}>✓</span> : <span style={{ color: 'var(--red)' }}>✗</span>}</span>
+                              </div>
+                            </div>
+                          )}
+                          <div style={sep}>
+                            <div style={lbl}>Outcome mapping</div>
+                            <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--accent)', marginTop: 2, wordBreak: 'break-all' }}>{PLINKO_OUTCOME_MAPPING}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div></div>
+                )}
               </div>
             );
           })}
