@@ -157,7 +157,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .play-btn-arc { margin-bottom: -4px; }
 .bgc-block { display: flex; flex-direction: column; align-items: center; gap: 5px; align-self: flex-start; }
 .bgc-block-label {
-  font-size: 13px; font-weight: 700; color: #D9CBF2;
+  font-size: 13px; font-weight: 700; color: #C9C3E8;
 }
 .bgc-card {
   display: flex; flex-direction: column; gap: 4px;
@@ -175,18 +175,18 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 /* Number of bets (appears in Auto mode) */
 .bgc-nob { display: flex; flex-direction: column; gap: 3px; padding-top: 2px; }
-.bgc-nob-label { font-size: 11px; font-weight: 600; color: #EFE9FF; text-align: center; }
+.bgc-nob-label { font-size: 11px; font-weight: 600; color: #C9C3E8; text-align: center; }
 .bgc-nob-row { display: flex; align-items: center; gap: 4px; }
 .bgc-nob-btn {
   flex: 1; height: 24px; border: none; border-radius: 6px;
-  background: #5B4A9E; color: #fff; font-size: 14px; font-weight: 700;
+  background: #272859; color: #fff; font-size: 14px; font-weight: 700;
   cursor: pointer; font-family: inherit; transition: background 0.12s;
 }
-.bgc-nob-btn:hover:not(:disabled) { background: #6D5BB5; }
+.bgc-nob-btn:hover:not(:disabled) { background: #353566; }
 .bgc-nob-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .bgc-nob-val {
   min-width: 40px; height: 24px; border-radius: 6px;
-  background: #241A4A; color: #fff;
+  background: #120D24; color: #F7931A;
   display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 800;
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
@@ -657,11 +657,11 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    ══════════════════════════════════════════════════════ */
 .app.bg-scene {
   background:
-    radial-gradient(ellipse 90% 55% at 50% 8%, rgba(120, 200, 230, 0.22), rgba(120, 200, 230, 0) 70%),
-    linear-gradient(180deg, #1D6A87 0%, #154C64 48%, #0E2A3C 100%);
+    radial-gradient(ellipse 90% 55% at 50% 8%, rgba(247, 147, 26, 0.10), rgba(247, 147, 26, 0) 70%),
+    linear-gradient(180deg, #2B2660 0%, #1C1843 48%, #120D24 100%);
 }
 .loading-screen {
-  background: linear-gradient(180deg, #1D6A87 0%, #154C64 48%, #0E2A3C 100%);
+  background: linear-gradient(180deg, #2B2660 0%, #1C1843 48%, #120D24 100%);
 }
 
 /* Floating top layer (no header bar, like BGaming) */
@@ -673,9 +673,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .fx-title {
   position: absolute; left: 50%; top: 12px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 8px;
-  color: #FFC53D;
+  color: #F7931A;
   font-size: 24px; font-weight: 900; letter-spacing: 0.06em;
-  text-shadow: 0 2px 0 #B06E00, 0 4px 10px rgba(0,0,0,0.35);
+  text-shadow: 0 2px 0 #9A5300, 0 4px 10px rgba(0,0,0,0.4);
 }
 .fx-actions { display: flex; gap: 10px; pointer-events: auto; }
 .fx-btn {
@@ -687,7 +687,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .fx-btn svg { width: 18px; height: 18px; }
 .fx-btn:hover { background: rgba(255,255,255,0.14); }
-.fx-btn.fx-on { background: #FFC53D; border-color: #FFC53D; color: #0E2A3C; }
+.fx-btn.fx-on { background: #F7931A; border-color: #F7931A; color: #120D24; }
 
 /* Desktop bet history table, left of the board */
 .fx-hist {
@@ -705,7 +705,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.2fr;
   padding: 5px 10px; border: none; border-radius: 6px;
   background: transparent; text-align: left; cursor: pointer;
-  color: #CFE4EE; font-size: 12.5px; font-weight: 500;
+  color: #C9C3E8; font-size: 12.5px; font-weight: 500;
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
   transition: background 0.12s;
 }
@@ -713,32 +713,32 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 @media (max-width: 1000px) { .fx-hist { display: none; } }
 
 /* Lines rail — white active chip on translucent list */
-.lines-rail-label { color: #EAF6FC; }
+.lines-rail-label { color: #D5D0F0; }
 .lines-rail-btn {
-  background: rgba(10, 44, 62, 0.55);
-  border: 1px solid rgba(255,255,255,0.16);
-  color: #DFF1FA;
+  background: rgba(35, 32, 78, 0.75);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #D5D0F0;
 }
 .lines-rail-btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); color: #fff; }
-.lines-rail-btn.active { background: #FFFFFF; border-color: #FFFFFF; color: #0E2A3C; font-weight: 800; }
+.lines-rail-btn.active { background: #F7931A; border-color: #F7931A; color: #fff; font-weight: 800; }
 
 /* Purple control cards */
 .bgc-card {
-  background: rgba(104, 84, 172, 0.72);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(35, 32, 78, 0.88);
+  border: 1px solid rgba(255,255,255,0.10);
   backdrop-filter: blur(6px);
-  box-shadow: 0 8px 24px rgba(5, 25, 38, 0.35);
+  box-shadow: 0 8px 24px rgba(10, 8, 24, 0.45);
 }
-.bgc-card-label { color: #EFE9FF; }
+.bgc-card-label { color: #C9C3E8; }
 .bgc-opt {
-  background: rgba(58, 44, 108, 0.92);
-  border: 1px solid transparent;
+  background: rgba(18, 13, 36, 0.9);
+  border: 1px solid rgba(255,255,255,0.06);
   color: #FFFFFF;
 }
-.bgc-opt:hover:not(:disabled) { background: rgba(74, 58, 132, 0.95); }
+.bgc-opt:hover:not(:disabled) { background: rgba(39, 40, 89, 0.95); }
 .bgc-opt.active-mode {
-  background: rgba(38, 27, 78, 0.95);
-  border-color: rgba(255,255,255,0.35);
+  background: rgba(247, 147, 26, 0.16);
+  border-color: rgba(247, 147, 26, 0.55);
   color: #fff;
 }
 .bgc-opt-ico { background: #E91E8C; }
@@ -750,29 +750,29 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     radial-gradient(circle at 36% 30%, #FFFFFF 0%, #F4F7FA 45%, #D9E4EC 78%, #B8CBD8 100%);
   color: #E9A53C;
   box-shadow:
-    0 0 0 5px #F3B93B,
-    0 0 0 7px #C88E1D,
-    0 12px 30px rgba(5, 25, 38, 0.5),
-    inset 0 -6px 14px rgba(150, 175, 195, 0.55),
+    0 0 0 5px #F7931A,
+    0 0 0 7px #B96300,
+    0 12px 30px rgba(10, 8, 24, 0.55),
+    inset 0 -6px 14px rgba(160, 155, 200, 0.5),
     inset 0 4px 6px rgba(255,255,255,0.9);
 }
-.play-btn-label { color: #E9A53C; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
-.play-btn-sub { color: #7E6420; }
+.play-btn-label { color: #F7931A; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
+.play-btn-sub { color: #8A5A10; }
 /* STOP state: same white orb, thicker ORANGE ring, orange STOP text with the
    remaining-bets count beneath (matches BGaming's auto run) */
 .play-btn.stop {
   background:
     radial-gradient(circle at 36% 30%, #FFFFFF 0%, #F4F7FA 45%, #D9E4EC 78%, #B8CBD8 100%);
   box-shadow:
-    0 0 0 6px #F07617,
-    0 0 0 8px #FF9A3D,
-    0 12px 30px rgba(5, 25, 38, 0.5),
-    inset 0 -6px 14px rgba(150, 175, 195, 0.55),
+    0 0 0 6px #F85F5D,
+    0 0 0 8px #C13A38,
+    0 12px 30px rgba(10, 8, 24, 0.55),
+    inset 0 -6px 14px rgba(160, 155, 200, 0.5),
     inset 0 4px 6px rgba(255,255,255,0.9);
 }
-.play-btn.stop .play-btn-label { color: #F07617; font-size: 19px; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
+.play-btn.stop .play-btn-label { color: #F85F5D; font-size: 19px; text-shadow: 0 1px 0 rgba(255,255,255,0.8); }
 .play-btn-count {
-  color: #F07617; font-size: 15px; font-weight: 800;
+  color: #F85F5D; font-size: 15px; font-weight: 800;
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
 }
 
@@ -781,10 +781,10 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   position: absolute; top: 62px; left: 50%; transform: translateX(-50%);
   z-index: 40; pointer-events: none;
   padding: 9px 34px; border-radius: 12px;
-  background: linear-gradient(180deg, #FFB53D 0%, #F07617 100%);
-  border: 2px solid #FFD98A;
-  box-shadow: 0 8px 30px rgba(240, 118, 23, 0.5), inset 0 2px 0 rgba(255,255,255,0.45);
-  color: #4A2500;
+  background: linear-gradient(180deg, #FFB13D 0%, #F7931A 100%);
+  border: 2px solid #FFD59A;
+  box-shadow: 0 8px 30px rgba(247, 147, 26, 0.5), inset 0 2px 0 rgba(255,255,255,0.45);
+  color: #3A1D00;
   font-size: 19px; font-weight: 900; letter-spacing: 0.02em;
   animation: winBanner 1.8s ease forwards;
   white-space: nowrap;
@@ -799,21 +799,21 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Purple bet pills + white bet text */
 .bgc-pill {
-  background: #5B4A9E;
-  border: 1px solid rgba(255,255,255,0.12);
+  background: #272859;
+  border: 1px solid rgba(255,255,255,0.10);
   color: #fff;
 }
-.bgc-pill:hover:not(:disabled) { background: #6D5BB5; border-color: rgba(255,255,255,0.25); color: #fff; }
+.bgc-pill:hover:not(:disabled) { background: #353566; border-color: rgba(247,147,26,0.45); color: #F7931A; }
 .bgc-bet-display span { color: #FFFFFF; }
 .bgc-bet-display input {
   color: #FFFFFF;
   border-bottom: 1px dashed rgba(255,255,255,0.35);
 }
-.bgc-balance { color: #C9BCE9; }
+.bgc-balance { color: #8B8BA3; }
 .bgc-balance b { color: #FFFFFF; }
 
 /* Bucket tooltip on the teal scene */
-.bucket-tooltip { background: rgba(10, 40, 58, 0.95); border-color: rgba(255,255,255,0.2); }
+.bucket-tooltip { background: rgba(28, 24, 67, 0.96); border-color: rgba(255,255,255,0.18); }
 
 @media (max-width: 560px) {
   .header { padding: 0 10px; height: 44px; }

@@ -46,9 +46,9 @@ export function drawEntryHole(ctx: CanvasRenderingContext2D, geo: BoardGeometry,
   const x = w / 2;
   const y = geo.startY - geo.gap * 1.05;
   const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
-  g.addColorStop(0, '#03141f');
-  g.addColorStop(0.75, '#07202e');
-  g.addColorStop(1, 'rgba(7, 32, 46, 0.25)');
+  g.addColorStop(0, '#080617');
+  g.addColorStop(0.75, '#0E0B20');
+  g.addColorStop(1, 'rgba(14, 11, 32, 0.25)');
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = g;
@@ -61,8 +61,8 @@ export function drawPinGlows(ctx: CanvasRenderingContext2D, glows: PinGlow[], pi
     const alpha = (1 - age) * 0.5;
     const r = pinR + 8 + age * 5;
     const grd = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
-    grd.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-    grd.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    grd.addColorStop(0, `rgba(247, 147, 26, ${alpha})`);
+    grd.addColorStop(1, 'rgba(247, 147, 26, 0)');
     ctx.beginPath();
     ctx.arc(g.x, g.y, r, 0, Math.PI * 2);
     ctx.fillStyle = grd;
@@ -77,12 +77,12 @@ export function drawPins(ctx: CanvasRenderingContext2D, geo: BoardGeometry, glow
     const isHit = glows.some(g => Math.abs(g.x - pin.x) < 2 && Math.abs(g.y - pin.y) < 2);
     ctx.beginPath();
     ctx.arc(pin.x, pin.y + pinR * 0.35, pinR * 1.05, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(4, 24, 36, 0.35)';
+    ctx.fillStyle = 'rgba(10, 8, 24, 0.4)';
     ctx.fill();
     const g = ctx.createRadialGradient(pin.x - pinR * 0.35, pin.y - pinR * 0.4, pinR * 0.1, pin.x, pin.y, pinR);
     g.addColorStop(0, '#FFFFFF');
-    g.addColorStop(0.65, '#E8F2F7');
-    g.addColorStop(1, '#B9CFDB');
+    g.addColorStop(0.65, '#E9E5FA');
+    g.addColorStop(1, '#B8B2D9');
     ctx.beginPath();
     ctx.arc(pin.x, pin.y, isHit ? pinR + 0.6 : pinR, 0, Math.PI * 2);
     ctx.fillStyle = g;
@@ -148,7 +148,7 @@ export function drawBuckets(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = mult >= 1000 ? `x${(mult / 1000).toFixed(0)}K` : `x${mult}`;
-    ctx.fillStyle = '#0D2B3D';
+    ctx.fillStyle = '#2A1502';
     ctx.fillText(label, cx + chipW / 2, bucketTopY + chipH / 2 + 0.5);
 
     ctx.restore();
@@ -180,20 +180,20 @@ export function drawBall(ctx: CanvasRenderingContext2D, x: number, y: number, ba
     if (sz <= 0) continue;
     ctx.beginPath();
     ctx.arc(dot.x, dot.y, sz, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(233, 55, 88, ${alpha})`;
+    ctx.fillStyle = `rgba(247, 147, 26, ${alpha})`;
     ctx.fill();
   }
 
   ctx.beginPath();
   ctx.arc(x, y + ballR * 0.4, ballR * 1.05, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(4, 24, 36, 0.3)';
+  ctx.fillStyle = 'rgba(10, 8, 24, 0.35)';
   ctx.fill();
 
   const bg = ctx.createRadialGradient(x - ballR * 0.35, y - ballR * 0.4, ballR * 0.15, x, y, ballR);
-  bg.addColorStop(0, '#FF8FB0');
-  bg.addColorStop(0.35, '#EE2F5B');
-  bg.addColorStop(0.8, '#C41C44');
-  bg.addColorStop(1, '#8E1230');
+  bg.addColorStop(0, '#FFE0B0');
+  bg.addColorStop(0.35, '#F7931A');
+  bg.addColorStop(0.8, '#D9740A');
+  bg.addColorStop(1, '#8A4C02');
   ctx.beginPath();
   ctx.arc(x, y, ballR, 0, Math.PI * 2);
   ctx.fillStyle = bg;
@@ -226,7 +226,7 @@ export function drawWinPopups(ctx: CanvasRenderingContext2D, popups: WinPopup[],
     ctx.globalAlpha = Math.max(0, alpha * 0.92);
     ctx.fill();
     ctx.globalAlpha = Math.max(0, alpha);
-    ctx.fillStyle = '#0D2B3D';
+    ctx.fillStyle = '#2A1502';
     ctx.fillText(text, 0, 0);
     ctx.restore();
     ctx.globalAlpha = 1;
