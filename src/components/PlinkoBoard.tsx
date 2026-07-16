@@ -1,5 +1,4 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import Matter from 'matter-js';
 import { getBucketColor, slotProbability } from '../utils/multipliers';
 import { getGeometry, bucketAt } from '../game/geometry';
 import type { BoardGeometry } from '../game/geometry';
@@ -22,34 +21,53 @@ interface PlinkoBoardProps {
   paths: Map<number, number[]>;
 }
 
+// The ball is a scripted animation along the seed-derived path — the exact
+// approach production plinkos use. Every bounce follows dirs[], so the ball
+// lands in the paying bucket by construction; physics cannot disagree with
+// the payout because there is no physics in the outcome path.
 interface ActiveBall {
-  body: Matter.Body;
-  row: number;
   dirs: number[];
   targetSlot: number;
+  seg: number;          // current segment (0 = spawn→first pin)
+  segStart: number;     // timestamp when this segment began
+  segDur: number;       // per-segment duration with a little variance
+  jitter: number;       // small per-ball horizontal offset for life
+  x: number;
+  y: number;
   trail: TrailDot[];
-  stuck: number;
+  done: boolean;
 }
 
-const PHYSICS_STEP = 1000 / 60; // fixed timestep, decoupled from display refresh
-const TIME_SCALE = 1.35;
+const HOP_MS = 118;        // per-row hop duration
+const FIRST_DROP_MS = 200; // spawn → first pin
+const FINAL_DROP_MS = 210; // last pin → bucket
+
+// Pin the ball bounces on at row r: column = 1 + rights among dirs[0..r-1].
+function bouncePin(geo: BoardGeometry, w: number, dirs: number[], r: number) {
+  let rights = 0;
+  for (let i = 0; i < r; i++) rights += dirs[i];
+  const col = 1 + rights;
+  const sx = (w - (r + 2) * geo.gap) / 2;
+  return { x: sx + col * geo.gap, y: geo.startY + r * geo.gap };
+}
+
+function bucketCenterX(geo: BoardGeometry, numBuckets: number, slot: number) {
+  const bw = (geo.bottomRightX - geo.bottomLeftX) / numBuckets;
+  return geo.bottomLeftX + (slot + 0.5) * bw;
+}
 
 export default function PlinkoBoard({
   rows, multipliers, bet, onBallLand, ballQueue, onBallConsumed, paths,
 }: PlinkoBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const engineRef = useRef<Matter.Engine | null>(null);
   const renderLoopRef = useRef<number>(0);
   const activeBallsRef = useRef<Map<number, ActiveBall>>(new Map());
   const flashRef = useRef<Map<number, number>>(new Map());
   const sizeRef = useRef({ w: 0, h: 0 });
-  const landedRef = useRef<Set<number>>(new Set());
   const spawnedRef = useRef<Set<number>>(new Set());
   const pinGlowsRef = useRef<PinGlow[]>([]);
   const winPopupsRef = useRef<WinPopup[]>([]);
   const particlesRef = useRef<Particle[]>([]);
-  const lastTsRef = useRef(0);
-  const accRef = useRef(0);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; slot: number } | null>(null);
 
   const geometry = useCallback(
@@ -57,82 +75,15 @@ export default function PlinkoBoard({
     [rows],
   );
 
-  // Engine (physics is stepped inside the render loop for perfect sync)
+  // Reset transient state when the board shape changes
   useEffect(() => {
-    const engine = Matter.Engine.create({ gravity: { x: 0, y: 1.5, scale: 0.001 } });
-    engine.timing.timeScale = TIME_SCALE;
-    engineRef.current = engine;
-    return () => {
-      Matter.Engine.clear(engine);
-      engineRef.current = null;
-    };
-  }, []);
-
-  // Build world
-  useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    Matter.Composite.clear(engine.world, false);
     activeBallsRef.current.clear();
-    landedRef.current.clear();
     spawnedRef.current.clear();
     pinGlowsRef.current = [];
     winPopupsRef.current = [];
     particlesRef.current = [];
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const w = canvas.width / (window.devicePixelRatio || 1);
-    const h = canvas.height / (window.devicePixelRatio || 1);
-    sizeRef.current = { w, h };
-    const geo = geometry(w, h);
-    const { pins, endY, gap, topLeftX, topRightX, bottomLeftX, bottomRightX, startY, pinR, ballR } = geo;
-
-    pins.forEach(p => {
-      Matter.Composite.add(engine.world,
-        Matter.Bodies.circle(p.x, p.y, pinR + 1, {
-          isStatic: true, restitution: 0.5, friction: 0.0, label: `pin-${p.row}-${p.col}`,
-        })
-      );
-    });
-
-    // Angled boundary walls along the triangle edges
-    const wallPadding = ballR + 5;
-    const wallThickness = 10;
-    const leftWallLen = Math.sqrt((bottomLeftX - topLeftX) ** 2 + (endY - startY) ** 2) + gap;
-    const leftWallAngle = Math.atan2(endY - startY, (bottomLeftX - wallPadding) - (topLeftX - wallPadding));
-    const leftWallCx = ((topLeftX - wallPadding) + (bottomLeftX - wallPadding)) / 2;
-    const leftWallCy = (startY - gap / 2 + endY + gap / 2) / 2;
-    Matter.Composite.add(engine.world,
-      Matter.Bodies.rectangle(leftWallCx, leftWallCy, leftWallLen, wallThickness, {
-        isStatic: true, angle: leftWallAngle, restitution: 0.3, label: 'wallL',
-      })
-    );
-    const rightWallAngle = Math.atan2(endY - startY, (bottomRightX + wallPadding) - (topRightX + wallPadding));
-    const rightWallCx = ((topRightX + wallPadding) + (bottomRightX + wallPadding)) / 2;
-    Matter.Composite.add(engine.world,
-      Matter.Bodies.rectangle(rightWallCx, leftWallCy, leftWallLen, wallThickness, {
-        isStatic: true, angle: rightWallAngle, restitution: 0.3, label: 'wallR',
-      })
-    );
-
-    // Thick floor: a thin one can be tunneled through at high speed.
-    const bucketY = endY + gap * 0.65;
-    Matter.Composite.add(engine.world, [
-      Matter.Bodies.rectangle(w / 2, bucketY + 60, w * 2, 64, { isStatic: true, label: 'floor', restitution: 0.1 }),
-    ]);
-
-    // Bucket dividers
-    const numBuckets = rows + 1;
-    const bw = (bottomRightX - bottomLeftX) / numBuckets;
-    for (let i = 0; i <= numBuckets; i++) {
-      Matter.Composite.add(engine.world,
-        Matter.Bodies.rectangle(bottomLeftX + i * bw, bucketY + 8, 3, 36, {
-          isStatic: true, restitution: 0.2, label: 'divider',
-        })
-      );
-    }
-  }, [rows, geometry]);
+    flashRef.current.clear();
+  }, [rows]);
 
   // Resize
   useEffect(() => {
@@ -154,82 +105,26 @@ export default function PlinkoBoard({
     return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Collisions: pin deflection along the seed path + floor landing
-  useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-
-    const handler = (event: Matter.IEventCollision<Matter.Engine>) => {
-      event.pairs.forEach(pair => {
-        const { bodyA, bodyB } = pair;
-        const ball = bodyA.label.startsWith('ball-') ? bodyA : bodyB.label.startsWith('ball-') ? bodyB : null;
-        const pin = bodyA.label.startsWith('pin-') ? bodyA : bodyB.label.startsWith('pin-') ? bodyB : null;
-
-        if (ball && pin) {
-          const ballId = parseInt(ball.label.split('-')[1]);
-          const pinRow = parseInt(pin.label.split('-')[1]);
-          const info = activeBallsRef.current.get(ballId);
-          if (!info || pinRow < info.row) return;
-
-          const dir = info.dirs[pinRow] ?? (Math.random() > 0.5 ? 1 : 0);
-          info.row = pinRow + 1;
-          sound.pinHit(pinRow / rows);
-          pinGlowsRef.current.push({ x: pin.position.x, y: pin.position.y, time: Date.now() });
-
-          const hSpeed = Math.max(1.6, Math.abs(ball.velocity.y) * 0.5);
-          Matter.Body.setVelocity(ball, {
-            x: dir === 1 ? hSpeed : -hSpeed,
-            y: Math.max(1.8, ball.velocity.y * 0.45),
-          });
-        }
-
-        if (ball && (bodyA.label === 'floor' || bodyB.label === 'floor')) {
-          const ballId = parseInt(ball.label.split('-')[1]);
-          if (landedRef.current.has(ballId)) return;
-          landedRef.current.add(ballId);
-
-          const { w, h } = sizeRef.current;
-          const geo = geometry(w, h);
-          const numBuckets = rows + 1;
-          const bw = (geo.bottomRightX - geo.bottomLeftX) / numBuckets;
-
-          // The seed-derived slot is the authority; the funnel lands the ball
-          // there, so flash/popup use it too.
-          const info = activeBallsRef.current.get(ballId);
-          const slot = info
-            ? info.targetSlot
-            : Math.max(0, Math.min(numBuckets - 1, Math.floor((ball.position.x - geo.bottomLeftX) / bw)));
-
-          const now = Date.now();
-          flashRef.current.set(slot, now);
-          const mult = multipliers[slot] || 0;
-          const color = getBucketColor(slot, numBuckets);
-          const popupX = geo.bottomLeftX + (slot + 0.5) * bw;
-          const bucketTopY = geo.endY + geo.gap * 0.3;
-          winPopupsRef.current.push({ x: popupX, y: bucketTopY - 10, mult, time: now, color });
-          spawnWinParticles(particlesRef.current, popupX, bucketTopY, mult, color);
-
-          onBallLand(ballId);
-          setTimeout(() => {
-            if (engineRef.current) Matter.Composite.remove(engineRef.current.world, ball);
-            activeBallsRef.current.delete(ballId);
-          }, 150);
-        }
-      });
-    };
-
-    Matter.Events.on(engine, 'collisionStart', handler);
-    return () => Matter.Events.off(engine, 'collisionStart', handler);
-  }, [rows, multipliers, onBallLand, geometry]);
+  const settle = useCallback((id: number, targetSlot: number) => {
+    const { w, h } = sizeRef.current;
+    const geo = geometry(w, h);
+    const numBuckets = multipliers.length;
+    const now = Date.now();
+    flashRef.current.set(targetSlot, now);
+    const mult = multipliers[targetSlot] || 0;
+    const color = getBucketColor(targetSlot, numBuckets);
+    const popupX = bucketCenterX(geo, numBuckets, targetSlot);
+    const bucketTopY = geo.endY + geo.gap * 0.3;
+    winPopupsRef.current.push({ x: popupX, y: bucketTopY - 10, mult, time: now, color });
+    spawnWinParticles(particlesRef.current, popupX, bucketTopY, mult, color);
+    onBallLand(id);
+  }, [geometry, multipliers, onBallLand]);
 
   // Spawn queued balls (idempotent — StrictMode re-runs effects in dev)
   useEffect(() => {
     if (ballQueue.length === 0) return;
-    const engine = engineRef.current;
-    if (!engine) return;
     const { w, h } = sizeRef.current;
     const geo = geometry(w, h);
-    const { startY, ballR, endY, gap, bottomLeftX, bottomRightX } = geo;
 
     ballQueue.forEach(({ id, instant }) => {
       if (spawnedRef.current.has(id)) return;
@@ -237,45 +132,27 @@ export default function PlinkoBoard({
       const dirs = paths.get(id) || [];
       const targetSlot = dirs.reduce((a, b) => a + b, 0);
 
-      // Instant Bet: no physics — flash the bucket and settle immediately.
+      // Instant Bet: no animation — flash the bucket and settle immediately.
       if (instant) {
-        if (!landedRef.current.has(id)) {
-          landedRef.current.add(id);
-          const numBuckets = multipliers.length;
-          const bw = (bottomRightX - bottomLeftX) / numBuckets;
-          const now = Date.now();
-          flashRef.current.set(targetSlot, now);
-          const mult = multipliers[targetSlot] || 0;
-          const color = getBucketColor(targetSlot, numBuckets);
-          const popupX = bottomLeftX + (targetSlot + 0.5) * bw;
-          winPopupsRef.current.push({ x: popupX, y: endY + gap * 0.3 - 10, mult, time: now, color });
-          spawnWinParticles(particlesRef.current, popupX, endY + gap * 0.3, mult, color);
-          onBallLand(id);
-        }
+        settle(id, targetSlot);
         onBallConsumed(id);
         return;
       }
 
-      const ball = Matter.Bodies.circle(
-        w / 2 + (Math.random() - 0.5) * 4,
-        startY - 20,
-        ballR,
-        {
-          restitution: 0.4, friction: 0.05, density: 0.003, label: `ball-${id}`,
-          // Stake behavior: balls collide with pins, never with each other —
-          // no slingshots, pile-ups or tunneling from ball-ball impacts.
-          collisionFilter: { group: -1 },
-        }
-      );
-      Matter.Body.setVelocity(ball, { x: 0, y: 1.5 });
-      Matter.Composite.add(engine.world, ball);
-      activeBallsRef.current.set(id, { body: ball, row: 0, dirs, targetSlot, trail: [], stuck: 0 });
+      activeBallsRef.current.set(id, {
+        dirs, targetSlot,
+        seg: 0, segStart: performance.now(),
+        segDur: FIRST_DROP_MS,
+        jitter: (Math.random() - 0.5) * geo.gap * 0.14,
+        x: w / 2, y: geo.startY - 24,
+        trail: [], done: false,
+      });
       onBallConsumed(id);
       sound.drop();
     });
-  }, [ballQueue, paths, multipliers, onBallConsumed, onBallLand, geometry]);
+  }, [ballQueue, paths, geometry, settle, onBallConsumed]);
 
-  // Render + physics loop (fixed-timestep accumulator, one clock)
+  // Render loop — advances every ball along its scripted path and draws
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -283,30 +160,19 @@ export default function PlinkoBoard({
     if (!ctx) return;
 
     const frame = (ts: number) => {
-      const engine = engineRef.current;
       const dpr = window.devicePixelRatio || 1;
       const w = canvas.width / dpr;
       const h = canvas.height / dpr;
-
-      // Step physics on a fixed timestep so motion is identical across
-      // display refresh rates; cap the accumulator after tab throttling.
-      if (engine) {
-        if (!lastTsRef.current) lastTsRef.current = ts;
-        accRef.current = Math.min(accRef.current + (ts - lastTsRef.current), 100);
-        lastTsRef.current = ts;
-        while (accRef.current >= PHYSICS_STEP) {
-          Matter.Engine.update(engine, PHYSICS_STEP);
-          accRef.current -= PHYSICS_STEP;
-        }
-      }
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       drawBackground(ctx, w, h);
 
       const geo = geometry(w, h);
-      const { endY, bottomLeftX, bottomRightX, pinR, ballR } = geo;
+      const { gap, startY, endY, pinR, ballR } = geo;
       const now = Date.now();
+      const numBuckets = multipliers.length;
+      const bucketTopY = endY + gap * 0.3;
 
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       drawPinGlows(ctx, pinGlowsRef.current, pinR, now);
@@ -316,52 +182,66 @@ export default function PlinkoBoard({
       particlesRef.current = particlesRef.current.filter(p => p.life > 0);
       drawParticles(ctx, particlesRef.current);
 
-      activeBallsRef.current.forEach(info => {
-        const { body, trail } = info;
-        const { x, y } = body.position;
-        const numBuckets = multipliers.length;
-        const bw = (bottomRightX - bottomLeftX) / numBuckets;
-        const targetX = bottomLeftX + (info.targetSlot + 0.5) * bw;
+      // Advance and draw balls. Segments: 0 = spawn→pin(row 0);
+      // 1..rows-1 = pin(r-1)→pin(r); rows = pin(rows-1)→bucket.
+      const finished: number[] = [];
+      activeBallsRef.current.forEach((ball, id) => {
+        const totalSegs = ball.dirs.length + 1;
+        let t = (ts - ball.segStart) / ball.segDur;
 
-        // Anti-stuck watchdog: a ball balancing on a pin or wedged in place
-        // barely moves — kick it toward its own target bucket.
-        if (body.speed < 0.35) {
-          info.stuck += 1;
-          if (info.stuck > 25) {
-            const dirX = Math.sign(targetX - x) || (Math.random() < 0.5 ? -1 : 1);
-            Matter.Body.setVelocity(body, { x: dirX * 1.3, y: 3 });
-            info.stuck = 0;
+        while (t >= 1 && ball.seg < totalSegs) {
+          // Segment completed — bounce event or landing
+          if (ball.seg < ball.dirs.length) {
+            const pin = bouncePin(geo, w, ball.dirs, ball.seg);
+            pinGlowsRef.current.push({ x: pin.x, y: pin.y, time: now });
+            sound.pinHit(ball.seg / ball.dirs.length);
           }
+          ball.segStart += ball.segDur;
+          ball.seg += 1;
+          ball.segDur = ball.seg === totalSegs ? FINAL_DROP_MS : HOP_MS * (0.92 + Math.random() * 0.16);
+          if (ball.seg >= totalSegs) {
+            ball.done = true;
+            settle(id, ball.targetSlot);
+            finished.push(id);
+            break;
+          }
+          t = (ts - ball.segStart) / ball.segDur;
+        }
+        if (ball.done) return;
+
+        t = Math.max(0, Math.min(1, t));
+
+        // Endpoints of the current segment
+        let x0: number, y0: number, x1: number, y1: number, arc: number;
+        if (ball.seg === 0) {
+          x0 = w / 2 + ball.jitter; y0 = startY - 24;
+          const p = bouncePin(geo, w, ball.dirs, 0);
+          x1 = p.x; y1 = p.y - ballR - pinR;
+          arc = 0;
+        } else if (ball.seg < ball.dirs.length) {
+          const a = bouncePin(geo, w, ball.dirs, ball.seg - 1);
+          const b = bouncePin(geo, w, ball.dirs, ball.seg);
+          x0 = a.x; y0 = a.y - ballR - pinR;
+          x1 = b.x; y1 = b.y - ballR - pinR;
+          arc = gap * 0.38;
         } else {
-          info.stuck = 0;
+          const a = bouncePin(geo, w, ball.dirs, ball.dirs.length - 1);
+          x0 = a.x; y0 = a.y - ballR - pinR;
+          x1 = bucketCenterX(geo, numBuckets, ball.targetSlot) + ball.jitter * 0.5;
+          y1 = bucketTopY + 10;
+          arc = gap * 0.3;
         }
 
-        // Funnel: from just above the last pin row (all deflections consumed),
-        // steer into the seed-derived bucket.
-        if (y > endY - geo.gap * 0.35) {
-          const pull = Math.max(-3.5, Math.min(3.5, (targetX - x) * 0.1));
-          Matter.Body.setVelocity(body, { x: pull, y: Math.max(body.velocity.y, 2.2) });
-        }
+        // Parabolic hop: rise off the pin, then fall to the next
+        const ease = t * t; // accelerate downward like gravity
+        ball.x = x0 + (x1 - x0) * t;
+        ball.y = y0 + (y1 - y0) * ease - Math.sin(Math.PI * t) * arc;
 
-        trail.push({ x, y, time: now });
-        while (trail.length > 10) trail.shift();
-        drawBall(ctx, x, y, ballR, trail, now);
+        ball.trail.push({ x: ball.x, y: ball.y, time: now });
+        while (ball.trail.length > 10) ball.trail.shift();
+        drawBall(ctx, ball.x, ball.y, ballR, ball.trail, now);
       });
-
-      // Escape sweep: a ball that somehow left the board settles its wager.
-      activeBallsRef.current.forEach((info, id) => {
-        const by = info.body.position.y;
-        const bx = info.body.position.x;
-        if (by > h + 40 || bx < -60 || bx > w + 60) {
-          if (!landedRef.current.has(id)) {
-            landedRef.current.add(id);
-            flashRef.current.set(info.targetSlot, now);
-            onBallLand(id);
-          }
-          if (engineRef.current) Matter.Composite.remove(engineRef.current.world, info.body);
-          activeBallsRef.current.delete(id);
-        }
-      });
+      finished.forEach(id => activeBallsRef.current.delete(id));
 
       winPopupsRef.current = winPopupsRef.current.filter(p => now - p.time < 1400);
       drawWinPopups(ctx, winPopupsRef.current, now);
@@ -374,12 +254,8 @@ export default function PlinkoBoard({
     };
 
     renderLoopRef.current = requestAnimationFrame(frame);
-    return () => {
-      cancelAnimationFrame(renderLoopRef.current);
-      lastTsRef.current = 0;
-      accRef.current = 0;
-    };
-  }, [rows, multipliers, geometry, onBallLand, tooltip]);
+    return () => cancelAnimationFrame(renderLoopRef.current);
+  }, [rows, multipliers, geometry, settle, tooltip]);
 
   // Bucket hover tooltip (Stake shows odds/payout on hover)
   const onMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
