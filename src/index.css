@@ -826,18 +826,24 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .fx-btn { width: 36px; height: 36px; }
   .fx-btn svg { width: 15px; height: 15px; }
   .fx-actions { gap: 7px; }
-  /* Cluster scales down but keeps the identical BGaming arrangement */
-  .bgc-main { gap: 8px; min-height: 144px; }
-  .bgc-card { min-width: 96px; padding: 6px; }
-  .bgc-opt { height: 25px; font-size: 11px; padding: 0 7px; }
-  .play-btn { width: 86px; height: 86px; }
+  /* Cluster scales down but keeps the identical BGaming arrangement,
+     with breathing room between every element */
+  .bgc { gap: 12px; padding: 8px 12px calc(14px + env(safe-area-inset-bottom)); }
+  .bgc-main { gap: 14px; min-height: 163px; }
+  .bgc-block { gap: 6px; }
+  .bgc-card { min-width: 104px; padding: 8px; gap: 6px; }
+  .bgc-opt { height: 28px; font-size: 11px; padding: 0 8px; gap: 8px; }
+  .bgc-nob { gap: 5px; padding-top: 4px; }
+  .bgc-nob-btn, .bgc-nob-val { height: 26px; }
+  .play-btn { width: 88px; height: 88px; margin-top: 16px; }
   .play-btn-label { font-size: 17px; }
   .play-btn.stop .play-btn-label { font-size: 14px; }
-  .bgc-pill { min-width: 32px; height: 28px; font-size: 11px; padding: 0 6px; }
-  .bgc-bet-row { gap: 6px; }
-  .bgc-bet-side { gap: 3px; }
-  .bgc-bet-display { gap: 5px; }
+  .bgc-bet-row { gap: 12px; margin-top: 2px; }
+  .bgc-bet-side { gap: 6px; }
+  .bgc-pill { min-width: 40px; height: 32px; font-size: 11px; padding: 0 9px; }
+  .bgc-bet-display { gap: 6px; }
   .bgc-bet-display input { width: 64px; font-size: 15px; }
+  .bgc-balance { margin-top: 2px; }
   .lines-rail { right: 4px; }
   .lines-rail-btn { width: 28px; height: 21px; font-size: 10px; }
 }
