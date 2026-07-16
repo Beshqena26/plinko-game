@@ -7,7 +7,7 @@ export const MULTIPLIER_MAP: Record<RiskLevel, Record<number, number[]>> = {
     10: [8.9, 3, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 3, 8.9],
     11: [8.4, 3, 1.9, 1.3, 1, 0.7, 0.7, 1, 1.3, 1.9, 3, 8.4],
     12: [10, 3, 1.6, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 1.6, 3, 10],
-    13: [8.1, 4, 3, 1.9, 1.2, 0.9, 0.7, 0.9, 1.2, 1.9, 3, 4, 8.1],
+    13: [8.1, 4, 3, 1.9, 1.2, 0.9, 0.7, 0.7, 0.9, 1.2, 1.9, 3, 4, 8.1],
     14: [7.1, 4, 1.9, 1.4, 1.3, 1.1, 1, 0.5, 1, 1.1, 1.3, 1.4, 1.9, 4, 7.1],
     15: [15, 8, 3, 2, 1.5, 1.1, 1, 0.7, 0.7, 1, 1.1, 1.5, 2, 3, 8, 15],
     16: [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
@@ -38,6 +38,53 @@ export const MULTIPLIER_MAP: Record<RiskLevel, Record<number, number[]>> = {
 
 export function getMultipliers(risk: RiskLevel, rows: number): number[] {
   return MULTIPLIER_MAP[risk][rows] || MULTIPLIER_MAP[risk][16];
+}
+
+// Exact RTP for a risk/rows combination: EV = Σ C(n,k)/2ⁿ × mult_k.
+export function getRtp(risk: RiskLevel, rows: number): number {
+  const arr = getMultipliers(risk, rows);
+  const n = arr.length - 1;
+  let ev = 0;
+  let c = 1; // C(n,0)
+  for (let k = 0; k <= n; k++) {
+    ev += (c / 2 ** n) * arr[k];
+    c = (c * (n - k)) / (k + 1);
+  }
+  return ev;
+}
+
+// Binomial probability of landing in slot k of an n-row board.
+export function slotProbability(rows: number, k: number): number {
+  let c = 1;
+  for (let i = 0; i < k; i++) c = (c * (rows - i)) / (i + 1);
+  return c / 2 ** rows;
+}
+
+// Stake-style position gradient for the bucket row: hot red at the edges
+// through the brand orange to warm yellow at the center, regardless of the
+// multiplier values in the slot.
+const BUCKET_STOPS: [number, string][] = [
+  [0, '#FFD24D'],   // center
+  [0.45, '#F7931A'],
+  [0.75, '#FF6B44'],
+  [1, '#F8385D'],   // edge
+];
+function hexLerp(a: string, b: string, t: number): string {
+  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
+  return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+export function getBucketColor(index: number, count: number): string {
+  const center = (count - 1) / 2;
+  const t = center === 0 ? 0 : Math.abs(index - center) / center;
+  for (let i = 1; i < BUCKET_STOPS.length; i++) {
+    if (t <= BUCKET_STOPS[i][0]) {
+      const [t0, c0] = BUCKET_STOPS[i - 1];
+      const [t1, c1] = BUCKET_STOPS[i];
+      return hexLerp(c0, c1, (t - t0) / (t1 - t0));
+    }
+  }
+  return BUCKET_STOPS[BUCKET_STOPS.length - 1][1];
 }
 
 // MYBC brand heat scale: red at the hot edges, through the accent

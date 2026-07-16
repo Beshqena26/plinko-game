@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { BetResult } from '../App';
 import { fmt } from '../App';
 import type { RiskLevel } from '../utils/multipliers';
+import { getRtp } from '../utils/multipliers';
 import { sha256, randomHex, getPath } from '../utils/provablyFair';
 import { MIN_BET, MAX_BET } from './SidePanel';
 
@@ -47,7 +48,8 @@ function DrawerShell({ open, onClose, title, children, footer }: DrawerShellProp
 }
 
 /* ===== GameInfoDrawer (How to Play) ===== */
-export function InfoDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function InfoDrawer({ open, onClose, risk, rows }: { open: boolean; onClose: () => void; risk: RiskLevel; rows: number }) {
+  const rtpPct = (getRtp(risk, rows) * 100).toFixed(2);
   return (
     <DrawerShell open={open} onClose={onClose} title="How to Play">
       <div className="drw-text" style={{ marginBottom: 10 }}>
@@ -60,6 +62,7 @@ export function InfoDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         <div className="drw-stat-row"><span className="drw-stat-label">Rows</span><span className="drw-stat-value">8 – 16</span></div>
         <div className="drw-stat-row"><span className="drw-stat-label">Risk Levels</span><span className="drw-stat-value">Low · Medium · High</span></div>
         <div className="drw-stat-row"><span className="drw-stat-label">Max Multiplier</span><span className="drw-stat-value green">1000x</span></div>
+        <div className="drw-stat-row"><span className="drw-stat-label">RTP (current mode)</span><span className="drw-stat-value green">{rtpPct}%</span></div>
       </div>
       <div className="drw-card">
         <div className="drw-card-title">Game Flow</div>

@@ -11,6 +11,7 @@ interface Props {
   risk: RiskLevel;
   setRisk: (v: RiskLevel) => void;
   autoRunning: boolean;
+  ballsInFlight: number;
   autoPlayed: number;
   autoProfit: number;
   totalAutoRounds: string;
@@ -30,9 +31,12 @@ const RISKS: { v: RiskLevel; l: string; c: string }[] = [
 
 export default function SidePanel({
   balance, betStr, setBetStr, rows, setRows, risk, setRisk,
-  autoRunning, autoPlayed, autoProfit, totalAutoRounds,
+  autoRunning, ballsInFlight, autoPlayed, autoProfit, totalAutoRounds,
   onDrop, onStopAuto, onOpenAuto,
 }: Props) {
+  // Rows/risk changes rebuild the physics world, so they lock while any ball
+  // is still falling (each ball's payout is already snapshotted at drop time).
+  const boardLocked = autoRunning || ballsInFlight > 0;
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement)) {
@@ -91,7 +95,7 @@ export default function SidePanel({
               const on = risk === r.v;
               return (
                 <button
-                  key={r.v} className="risk-btn" onClick={() => setRisk(r.v)} disabled={autoRunning}
+                  key={r.v} className="risk-btn" onClick={() => setRisk(r.v)} disabled={boardLocked}
                   style={on ? { background: `${r.c}1c`, borderColor: `${r.c}55`, color: r.c } : undefined}
                 >{r.l}</button>
               );
@@ -101,9 +105,9 @@ export default function SidePanel({
         <div className="field field-rows">
           <label className="risk-label">Rows</label>
           <div className="stake-input">
-            <button className="stake-pm" onClick={() => setRows(Math.max(8, rows - 1))} disabled={autoRunning}>−</button>
+            <button className="stake-pm" onClick={() => setRows(Math.max(8, rows - 1))} disabled={boardLocked}>−</button>
             <span className="stake-amount" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{rows}</span>
-            <button className="stake-pm" onClick={() => setRows(Math.min(16, rows + 1))} disabled={autoRunning}>+</button>
+            <button className="stake-pm" onClick={() => setRows(Math.min(16, rows + 1))} disabled={boardLocked}>+</button>
           </div>
         </div>
       </div>

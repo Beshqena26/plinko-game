@@ -77,9 +77,14 @@ export default function App() {
   const autoIds = useRef(new Set<number>());
   const autoStats = useRef<AutoSummary>({ rounds: 0, wins: 0, losses: 0, profit: 0 });
   const autoDoneRef = useRef(false);
+  // Everything a round needs is snapshotted at drop time: the payout is decided
+  // by the seed-derived slot (sum of rights), never by where physics happens to
+  // land, and later settings changes can't touch an in-flight ball.
   const pending = useRef(new Map<number, {
-    bet: number; nonce: number; dirs: number[]; serverSeed: string; clientSeed: string; seedHash: string;
+    bet: number; nonce: number; dirs: number[]; slot: number; mult: number;
+    serverSeed: string; clientSeed: string; seedHash: string;
   }>());
+  const [ballsInFlight, setBallsInFlight] = useState(0);
   const balanceRef = useRef(balance);
   balanceRef.current = balance;
   const betRef = useRef(1);
@@ -102,18 +107,22 @@ export default function App() {
   const drop = useCallback(async (isAuto = false) => {
     const bet = betRef.current;
     if (balanceRef.current < bet || bet <= 0) return false;
+    if (pending.current.size >= 20) return false; // physics sanity cap
     setBalance(p => p - bet);
     const id = ++idRef.current;
     const nonce = ++nonceRef.current;
     const { s, c } = seedRef.current;
     const dirs = await getPath(s, c, nonce, rows);
     const seedHash = await sha256(s);
+    const slot = dirs.reduce((a, b) => a + b, 0);
+    const mult = getMultipliers(risk, rows)[slot] ?? 0;
     paths.set(id, dirs);
-    pending.current.set(id, { bet, nonce, dirs, serverSeed: s, clientSeed: c, seedHash });
+    pending.current.set(id, { bet, nonce, dirs, slot, mult, serverSeed: s, clientSeed: c, seedHash });
+    setBallsInFlight(pending.current.size);
     if (isAuto) autoIds.current.add(id);
     setBallQueue(p => [...p, id]);
     return true;
-  }, [rows, paths]);
+  }, [rows, risk, paths]);
 
   // Auto summary appears once the run has ended AND its last ball has landed.
   const maybeShowAutoSummary = useCallback(() => {
@@ -123,19 +132,18 @@ export default function App() {
     }
   }, []);
 
-  const onLand = useCallback((idx: number) => {
-    const m = getMultipliers(risk, rows)[idx];
-    if (m == null) return;
-    const e = Array.from(pending.current.entries());
-    if (!e.length) return;
-    const [bid, { bet, nonce, dirs, serverSeed: ss, clientSeed: cs, seedHash }] = e[0];
-    pending.current.delete(bid);
-    const pay = +(bet * m).toFixed(2);
+  const onLand = useCallback((ballId: number) => {
+    const entry = pending.current.get(ballId);
+    if (!entry) return;
+    pending.current.delete(ballId);
+    setBallsInFlight(pending.current.size);
+    const { bet, nonce, dirs, slot, mult, serverSeed: ss, clientSeed: cs, seedHash } = entry;
+    const pay = +(bet * mult).toFixed(2);
     const profit = pay - bet;
     setBalance(p => p + pay);
-    sound.land(m);
-    if (autoIds.current.has(bid)) {
-      autoIds.current.delete(bid);
+    sound.land(mult);
+    if (autoIds.current.has(ballId)) {
+      autoIds.current.delete(ballId);
       const st = autoStats.current;
       st.rounds += 1;
       if (profit >= 0) st.wins += 1; else st.losses += 1;
@@ -144,10 +152,10 @@ export default function App() {
       maybeShowAutoSummary();
     }
     setHistory(p => [{
-      id: bid, mult: m, profit, bet, pay, time: Date.now(), nonce,
-      serverSeed: ss, clientSeed: cs, seedHash, dirs, slot: idx,
+      id: ballId, mult, profit, bet, pay, time: Date.now(), nonce,
+      serverSeed: ss, clientSeed: cs, seedHash, dirs, slot,
     }, ...p].slice(0, 50));
-  }, [risk, rows, maybeShowAutoSummary]);
+  }, [maybeShowAutoSummary]);
 
   const onConsumed = useCallback((id: number) => setBallQueue(p => p.filter(x => x !== id)), []);
 
@@ -240,6 +248,7 @@ export default function App() {
               risk={risk}
               setRisk={setRisk}
               autoRunning={autoRunning}
+              ballsInFlight={ballsInFlight}
               autoPlayed={autoPlayed}
               autoProfit={autoProfit}
               totalAutoRounds={totalAutoRounds}
@@ -280,7 +289,7 @@ export default function App() {
         </div>
       </div>
 
-      <InfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <InfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} risk={risk} rows={rows} />
       <PfDrawer
         open={pfOpen} onClose={() => setPfOpen(false)}
         serverSeed={serverSeed} clientSeed={clientSeed}

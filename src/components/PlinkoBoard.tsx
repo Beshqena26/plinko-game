@@ -1,12 +1,12 @@
 import { useRef, useEffect, useCallback } from 'react';
 import Matter from 'matter-js';
-import { getMultiplierColor } from '../utils/multipliers';
+import { getBucketColor } from '../utils/multipliers';
 import { sound } from '../utils/sound';
 
 interface PlinkoBoardProps {
   rows: number;
   multipliers: number[];
-  onBallLand: (bucketIndex: number) => void;
+  onBallLand: (ballId: number) => void;
   ballQueue: number[];
   onBallConsumed: (id: number) => void;
   paths: Map<number, number[]>;
@@ -34,7 +34,7 @@ export default function PlinkoBoard({
   const engineRef = useRef<Matter.Engine | null>(null);
   const runnerRef = useRef<Matter.Runner | null>(null);
   const renderLoopRef = useRef<number>(0);
-  const activeBallsRef = useRef<Map<number, { body: Matter.Body; row: number; dirs: number[]; trail: TrailDot[]; stuck: number }>>(new Map());
+  const activeBallsRef = useRef<Map<number, { body: Matter.Body; row: number; dirs: number[]; targetSlot: number; trail: TrailDot[]; stuck: number }>>(new Map());
   const flashRef = useRef<Map<number, number>>(new Map());
   const sizeRef = useRef({ w: 0, h: 0 });
   const landedRef = useRef<Set<number>>(new Set());
@@ -156,8 +156,10 @@ export default function PlinkoBoard({
 
     // Floor + side walls
     const bucketY = endY + gap * 0.65;
+    // Thick floor: rapid ball-ball collisions can slingshot a ball fast enough
+    // to tunnel through a thin static body, orphaning its wager.
     Matter.Composite.add(engine.world, [
-      Matter.Bodies.rectangle(w / 2, bucketY + 40, w * 2, 20, { isStatic: true, label: 'floor', restitution: 0.1 }),
+      Matter.Bodies.rectangle(w / 2, bucketY + 60, w * 2, 64, { isStatic: true, label: 'floor', restitution: 0.1 }),
     ]);
 
     // Bucket dividers — aligned to bottom row pin positions
@@ -244,13 +246,17 @@ export default function PlinkoBoard({
           const numBuckets = rows + 1;
           const bucketTotalW = geo.bottomRightX - geo.bottomLeftX;
           const bw = bucketTotalW / numBuckets;
-          const relX = ball.position.x - geo.bottomLeftX;
-          const idx = Math.floor(relX / bw);
-          const clampedIdx = Math.max(0, Math.min(numBuckets - 1, idx));
+
+          // The seed-derived slot is the authority for what this ball pays;
+          // the guided physics lands it there, so flash/popup use it too.
+          const info = activeBallsRef.current.get(ballId);
+          const clampedIdx = info
+            ? info.targetSlot
+            : Math.max(0, Math.min(numBuckets - 1, Math.floor((ball.position.x - geo.bottomLeftX) / bw)));
 
           flashRef.current.set(clampedIdx, Date.now());
           const mult = multipliers[clampedIdx] || 0;
-          const color = getMultiplierColor(mult);
+          const color = getBucketColor(clampedIdx, numBuckets);
           const popupX = geo.bottomLeftX + clampedIdx * bw + bw / 2;
           const bucketTopY = geo.endY + geo.gap * 0.3;
 
@@ -270,7 +276,7 @@ export default function PlinkoBoard({
             }
           }
 
-          onBallLand(clampedIdx);
+          onBallLand(ballId);
           setTimeout(() => {
             if (engineRef.current) Matter.Composite.remove(engineRef.current.world, ball);
             activeBallsRef.current.delete(ballId);
@@ -301,7 +307,8 @@ export default function PlinkoBoard({
       );
       Matter.Body.setVelocity(ball, { x: 0, y: 1.5 });
       Matter.Composite.add(engine.world, ball);
-      activeBallsRef.current.set(id, { body: ball, row: 0, dirs, trail: [], stuck: 0 });
+      const targetSlot = dirs.reduce((a, b) => a + b, 0);
+      activeBallsRef.current.set(id, { body: ball, row: 0, dirs, targetSlot, trail: [], stuck: 0 });
       onBallConsumed(id);
       sound.drop();
     });
@@ -371,16 +378,23 @@ export default function PlinkoBoard({
 
       multipliers.forEach((mult, i) => {
         const x = bottomLeftX + i * bw;
-        const color = getMultiplierColor(mult);
+        const color = getBucketColor(i, numBuckets);
         const flashTime = flashRef.current.get(i);
         const isFlashing = flashTime && now - flashTime < 500;
         const flashI = isFlashing ? 1 - (now - flashTime!) / 500 : 0;
         const [bR, bG, bB] = hexToRgb(color);
 
+        // Stake-style press-down: the bucket dips and springs back on a hit.
+        const pressP = flashTime ? (now - flashTime) / 380 : 1;
+        const pressY = pressP < 1 ? Math.sin(Math.min(pressP, 1) * Math.PI) * Math.min(7, gap * 0.28) : 0;
+
         // 3D Bucket
         const cupW = bw - 2;
         const cupH = 24;
         const taper = cupW * 0.1;
+
+        ctx.save();
+        ctx.translate(0, pressY);
 
         ctx.beginPath();
         ctx.moveTo(x + 1 + taper, bucketTopY);
@@ -436,6 +450,7 @@ export default function PlinkoBoard({
         ctx.globalAlpha = isFlashing ? 1 : 0.9;
         ctx.fillText(label, x + bw / 2, labelY);
         ctx.globalAlpha = 1;
+        ctx.restore();
       });
 
       // Particles
@@ -467,6 +482,16 @@ export default function PlinkoBoard({
           }
         } else {
           info.stuck = 0;
+        }
+
+        // Funnel: once past the last pin row, steer the ball into its
+        // seed-derived bucket so the visual always matches the payout.
+        if (y > endY + 2) {
+          const numBuckets = multipliers.length;
+          const bw = (bottomRightX - bottomLeftX) / numBuckets;
+          const targetX = bottomLeftX + (info.targetSlot + 0.5) * bw;
+          const pull = Math.max(-3, Math.min(3, (targetX - x) * 0.08));
+          Matter.Body.setVelocity(body, { x: pull, y: Math.max(body.velocity.y, 1.2) });
         }
         trail.push({ x, y, time: now });
         while (trail.length > 10) trail.shift();
@@ -511,6 +536,22 @@ export default function PlinkoBoard({
         ctx.fill();
       });
 
+      // Escape sweep: if a ball somehow left the board (tunneled through a
+      // wall or the floor), settle its wager anyway — no bet may ever hang.
+      activeBallsRef.current.forEach((info, id) => {
+        const by = info.body.position.y;
+        const bx = info.body.position.x;
+        if (by > h + 40 || bx < -60 || bx > w + 60) {
+          if (!landedRef.current.has(id)) {
+            landedRef.current.add(id);
+            flashRef.current.set(info.targetSlot, now);
+            onBallLand(id);
+          }
+          if (engineRef.current) Matter.Composite.remove(engineRef.current.world, info.body);
+          activeBallsRef.current.delete(id);
+        }
+      });
+
       // Win popups
       winPopupsRef.current = winPopupsRef.current.filter(p => now - p.time < 1400);
       winPopupsRef.current.forEach(p => {
@@ -552,7 +593,7 @@ export default function PlinkoBoard({
 
     renderLoopRef.current = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(renderLoopRef.current);
-  }, [rows, multipliers, getGeometry]);
+  }, [rows, multipliers, getGeometry, onBallLand]);
 
   return (
     <div className="relative w-full h-full">
