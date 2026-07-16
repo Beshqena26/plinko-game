@@ -75,10 +75,9 @@ export function drawBuckets(
   hovered: number | null,
   now: number,
 ) {
-  const { gap, endY, bucketLeftX } = geo;
+  const { gap, bucketLeftX, bucketTopY } = geo;
   const numBuckets = multipliers.length;
-  const bw = gap; // one bucket per landing position, aligned to the pin grid
-  const bucketTopY = endY + gap * 0.3;
+  const bw = gap; // one bucket per bottom-row gap, aligned to the pin grid
 
   multipliers.forEach((mult, i) => {
     const x = bucketLeftX + i * bw;
@@ -93,8 +92,10 @@ export function drawBuckets(
     const pressP = flashTime ? (now - flashTime) / 380 : 1;
     const pressY = pressP < 1 ? Math.sin(Math.min(pressP, 1) * Math.PI) * Math.min(7, gap * 0.28) : 0;
 
-    const cupW = bw - 2;
-    const cupH = 24;
+    // All bucket metrics scale with the pin gap so proportions stay
+    // identical from phone to desktop.
+    const cupW = bw - Math.max(1.5, gap * 0.06);
+    const cupH = gap * 0.62;
     const taper = cupW * 0.1;
 
     ctx.save();
@@ -133,8 +134,10 @@ export function drawBuckets(
       ctx.restore();
     }
 
-    const labelY = bucketTopY + cupH + 15;
-    const fontSize = bw < 26 ? 7 : bw < 34 ? 8 : bw < 44 ? 9 : 10;
+    const labelY = bucketTopY + cupH + Math.max(9, gap * 0.42);
+    const fontSize = Math.max(6.5, Math.min(10, gap * 0.28));
+    const padX = Math.max(2.5, gap * 0.13);
+    const boxH = fontSize + 7;
     ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -142,7 +145,7 @@ export function drawBuckets(
     const tw = ctx.measureText(label).width;
 
     ctx.beginPath();
-    ctx.roundRect(x + bw / 2 - tw / 2 - 5, labelY - 8, tw + 10, 16, 4);
+    ctx.roundRect(x + bw / 2 - tw / 2 - padX, labelY - boxH / 2, tw + padX * 2, boxH, 4);
     ctx.fillStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.15 + base + flashI * 0.25})`;
     ctx.fill();
     ctx.strokeStyle = `rgba(${bR}, ${bG}, ${bB}, ${0.25 + base + flashI * 0.3})`;

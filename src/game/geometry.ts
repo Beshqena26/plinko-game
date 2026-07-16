@@ -9,10 +9,11 @@ export interface BoardGeometry {
   bottomRightX: number;
   topLeftX: number;
   topRightX: number;
-  /* Bucket row: rows+1 slots of width exactly `gap`, centered under the inner
-     gaps of the bottom pin row — the only positions a ball can land in. */
+  /* Bucket row: rows+1 slots of width exactly `gap`, one in each gap of the
+     bottom pin row — the only positions a ball can land in. */
   bucketLeftX: number;
   bucketRightX: number;
+  bucketTopY: number;
   pinR: number;
   ballR: number;
 }
@@ -22,21 +23,28 @@ export interface BoardGeometry {
 export const pinRadiusFor = (gap: number) => Math.max(2.5, Math.min(4, gap * 0.13));
 export const ballRadiusFor = (gap: number) => Math.max(4.5, Math.min(8, gap * 0.22));
 
-// Row r has (r+3) pins spaced by `gap`; buckets are the rows+1 slots aligned
-// to the bottom pin row.
+// The ball makes exactly `rows` bounces, one per pin row — so the board has
+// pin rows r = 0..rows-1 (row r has r+3 pins). The bottom row has rows+2 pins
+// spanning (rows+1)·gap, and the rows+1 buckets sit exactly in its gaps:
+// a ball with k rights lands at x = w/2 + (k − rows/2)·gap, the center of
+// bottom-row gap k.
 export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
-  const bottomPinCount = rows + 3;
-  const bottomSpan = bottomPinCount - 1; // in gap units
+  const bottomSpan = rows + 1; // bottom pin row span, in gap units
 
-  const maxGapW = (w - 60) / (bottomSpan + 1);
-  const maxGapH = (h - 130) / (rows + 2);
+  // Everything is sized in gap units so the board keeps identical proportions
+  // on any screen: (rows-1) gaps of pyramid + 1.2 of spawn room on top +
+  // 2.4 for the bucket cups and labels below.
+  const TOP_UNITS = 1.2;
+  const BOTTOM_UNITS = 2.4;
+  const maxGapW = (w * 0.92) / (bottomSpan + 1);
+  const maxGapH = h / (rows - 1 + TOP_UNITS + BOTTOM_UNITS);
   const gap = Math.min(38, maxGapW, maxGapH);
 
-  const boardH = gap * rows;
-  const startY = (h - boardH) / 2 - 10;
+  const contentH = gap * (rows - 1 + TOP_UNITS + BOTTOM_UNITS);
+  const startY = (h - contentH) / 2 + gap * TOP_UNITS;
 
   const pins: Pin[] = [];
-  for (let r = 0; r <= rows; r++) {
+  for (let r = 0; r < rows; r++) {
     const count = r + 3;
     const y = startY + r * gap;
     const totalW = (count - 1) * gap;
@@ -46,7 +54,7 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
     }
   }
 
-  const endY = startY + rows * gap;
+  const endY = startY + (rows - 1) * gap; // last pin row
 
   const bottomTotalW = bottomSpan * gap;
   const bottomLeftX = (w - bottomTotalW) / 2;
@@ -56,22 +64,21 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
   const topLeftX = (w - topTotalW) / 2;
   const topRightX = topLeftX + topTotalW;
 
-  // A ball with k rights lands at x = w/2 + (k − rows/2)·gap, so the rows+1
-  // buckets each span one gap, one gap inset from the bottom row's edges.
-  const bucketLeftX = w / 2 - ((rows + 1) / 2) * gap;
-  const bucketRightX = bucketLeftX + (rows + 1) * gap;
+  // Bucket edges sit exactly on the bottom-row pins.
+  const bucketLeftX = bottomLeftX;
+  const bucketRightX = bottomRightX;
+  const bucketTopY = endY + gap * 0.7;
 
   return {
     gap, startY, endY, pins, bottomLeftX, bottomRightX, topLeftX, topRightX,
-    bucketLeftX, bucketRightX,
+    bucketLeftX, bucketRightX, bucketTopY,
     pinR: pinRadiusFor(gap), ballR: ballRadiusFor(gap),
   };
 }
 
 // Bucket index under a canvas point, or null when outside the bucket band.
 export function bucketAt(geo: BoardGeometry, numBuckets: number, x: number, y: number): number | null {
-  const bucketTopY = geo.endY + geo.gap * 0.3;
-  if (y < bucketTopY - 4 || y > bucketTopY + 55) return null;
+  if (y < geo.bucketTopY - 4 || y > geo.bucketTopY + 55) return null;
   const i = Math.floor((x - geo.bucketLeftX) / geo.gap);
   return i >= 0 && i < numBuckets ? i : null;
 }

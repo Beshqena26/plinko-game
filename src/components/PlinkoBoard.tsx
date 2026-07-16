@@ -120,7 +120,7 @@ export default function PlinkoBoard({
     const mult = multipliers[targetSlot] || 0;
     const color = getBucketColor(targetSlot, numBuckets);
     const popupX = bucketCenterX(geo, targetSlot);
-    const bucketTopY = geo.endY + geo.gap * 0.3;
+    const bucketTopY = geo.bucketTopY;
     winPopupsRef.current.push({ x: popupX, y: bucketTopY - 10, mult, time: now, color });
     spawnWinParticles(particlesRef.current, popupX, bucketTopY, mult, color);
     onBallLand(id);
@@ -175,9 +175,9 @@ export default function PlinkoBoard({
       drawBackground(ctx, w, h);
 
       const geo = geometry(w, h);
-      const { gap, startY, endY, pinR, ballR } = geo;
+      const { gap, startY, pinR, ballR } = geo;
       const now = Date.now();
-      const bucketTopY = endY + gap * 0.3;
+      const bucketTopY = geo.bucketTopY;
 
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       drawPinGlows(ctx, pinGlowsRef.current, pinR, now);
