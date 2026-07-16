@@ -51,14 +51,11 @@ export default function App() {
 
   const game = usePlinkoGame(rows, risk);
 
-  // BGaming behavior: in Auto mode PLAY starts an endless run; STOP ends it.
+  // BGaming behavior: in Auto mode PLAY runs "Number of bets" rounds
+  // (∞ when set to 0); the STOP orb ends the run early.
   const onPlay = () => {
-    if (mode === 'auto') {
-      game.setAutoRounds('0');
-      game.startAuto('0');
-    } else {
-      void game.drop();
-    }
+    if (mode === 'auto') game.startAuto(game.autoRounds);
+    else void game.drop();
   };
 
   useEffect(() => {
@@ -144,10 +141,13 @@ export default function App() {
               setRisk={setRisk}
               mode={mode}
               setMode={setMode}
+              autoRounds={game.autoRounds}
+              setAutoRounds={game.setAutoRounds}
               autoRunning={game.autoRunning}
               ballsInFlight={game.ballsInFlight}
               autoPlayed={game.autoPlayed}
               autoProfit={game.autoProfit}
+              totalAutoRounds={game.autoRounds === '0' ? '∞' : game.autoRounds}
               onPlay={onPlay}
               onStopAuto={game.stopAuto}
             />
