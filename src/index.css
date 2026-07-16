@@ -1,52 +1,122 @@
 @import "tailwindcss";
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body, #root { height: 100%; }
+/* ══════════════════════════════════════════════════════
+   MYBC Originals theme — same palette as the RGS games
+   ══════════════════════════════════════════════════════ */
+:root {
+  --panel:        #23204E;
+  --board:        #120D24;
+  --elevated:     #272859;
+  --hairline:     rgba(255, 255, 255, 0.06);
+  --toggle-border:rgba(255, 255, 255, 0.12);
+
+  --text:         #FFFFFF;
+  --text-75:      rgba(255, 255, 255, 0.75);
+  --text-mid:     #8B8BA3;
+  --text-dim:     rgba(139, 139, 163, 0.50);
+
+  --accent:       #F7931A;
+  --accent-border:rgba(247, 147, 26, 0.45);
+  --accent-glow:  rgba(247, 147, 26, 0.20);
+
+  --green:        #0ECC68;
+  --green-bg:     rgba(14, 204, 104, 0.12);
+  --red:          #F85F5D;
+  --red-bg:       rgba(248, 95, 93, 0.15);
+}
+
+html, body, #root { height: 100dvh; }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #000514;
-  color: #fff;
-  overflow-x: hidden;
+  font-family: 'Montserrat', system-ui, sans-serif;
+  background: var(--board);
+  color: var(--text);
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   font-size: 14px;
   line-height: 1.5;
 }
 
-::-webkit-scrollbar { width: 4px; }
+.mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1A1726; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(145,159,192,0.12); border-radius: 2px; }
 
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-input[type="number"] { -moz-appearance: textfield; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
-/* Range */
+/* Range — accent orange, RGS style */
 input[type="range"] {
   -webkit-appearance: none; appearance: none;
   background: transparent; cursor: pointer; width: 100%; height: 24px;
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 4px; border-radius: 2px; background: #0ECC68;
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, #F7931A, #E67A00);
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
   width: 16px; height: 16px; border-radius: 50%;
-  background: #fff; border: 2px solid #0ECC68;
+  background: #fff; border: 2px solid var(--accent);
   margin-top: -6px;
-  box-shadow: 0 0 0 3px rgba(14,204,104,0.12), 0 1px 4px rgba(0,0,0,0.4);
+  box-shadow: 0 0 0 3px var(--accent-glow), 0 1px 4px rgba(0,0,0,0.4);
   transition: transform 0.15s;
 }
 input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.15); }
 input[type="range"]:disabled { opacity: 0.3; cursor: not-allowed; }
 
+/* Primary bet button — shared gradient from the RGS games */
+.place-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  width: 100%; height: 50px; border: none; border-radius: 10px;
+  background: linear-gradient(135deg, #F7931A 0%, #E67A00 100%);
+  color: #fff; font-family: inherit; font-weight: 800; font-size: 15px;
+  cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(247,147,26,0.30), inset 0 1px 0 rgba(255,255,255,0.2);
+  white-space: nowrap;
+}
+.place-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 24px rgba(247,147,26,0.40), inset 0 1px 0 rgba(255,255,255,0.2);
+  transform: translateY(-1px);
+}
+.place-btn:active:not(:disabled) { transform: translateY(0); }
+.place-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; transform: none; }
+.place-btn.stop-mode {
+  background: linear-gradient(135deg, #F85F5D 0%, #d63c3a 100%);
+  box-shadow: 0 4px 16px rgba(248,95,93,0.30), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.stake-bet-label { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.1; }
+.stake-bet-amount { font-size: 15px; font-weight: 800; color: #fff; line-height: 1.1; }
+
+/* Mode toggle active tab gradient */
+.mode-tab-active {
+  background: linear-gradient(257.95deg, #E67A00 2.9%, #F7931A 54.68%, #F7951C 95.53%);
+  color: #fff !important;
+  box-shadow: 0 2px 10px rgba(247,147,26,0.35);
+}
+
+/* Drawer (How to Play) */
+.drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 90;
+}
+.drawer-backdrop.show { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: min(380px, 92vw); background: var(--panel);
+  border-left: 1px solid var(--hairline);
+  display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: -16px 0 48px rgba(0,0,0,0.45);
+}
+.drawer-backdrop.show .drawer { transform: translateX(0); }
+
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 .anim-slide { animation: slideIn 0.2s ease-out; }
-.anim-fade { animation: fadeIn 0.15s ease-out; }

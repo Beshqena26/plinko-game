@@ -40,15 +40,16 @@ export function getMultipliers(risk: RiskLevel, rows: number): number[] {
   return MULTIPLIER_MAP[risk][rows] || MULTIPLIER_MAP[risk][16];
 }
 
-// Stake-style symmetric color gradient: red edges → green center
+// MYBC brand heat scale: red at the hot edges, through the accent
+// orange, down to muted purple for the losing center slots.
 export function getMultiplierColor(multiplier: number): string {
-  if (multiplier >= 100) return '#ff003f';
-  if (multiplier >= 25)  return '#ff1744';
-  if (multiplier >= 10)  return '#ff5722';
-  if (multiplier >= 5)   return '#ff6d00';
-  if (multiplier >= 3)   return '#ff9100';
-  if (multiplier >= 2)   return '#ffc400';
-  if (multiplier >= 1)   return '#c6ff00';
-  if (multiplier >= 0.5) return '#76ff03';
-  return '#00e676';
+  if (multiplier >= 100) return '#F85F5D';
+  if (multiplier >= 25)  return '#FF7052';
+  if (multiplier >= 10)  return '#FF8A3D';
+  if (multiplier >= 5)   return '#F7931A';
+  if (multiplier >= 3)   return '#FFA426';
+  if (multiplier >= 2)   return '#FFB833';
+  if (multiplier >= 1)   return '#FFD24D';
+  if (multiplier >= 0.5) return '#A29BD9';
+  return '#736DAF';
 }

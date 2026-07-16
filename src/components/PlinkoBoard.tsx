@@ -316,7 +316,7 @@ export default function PlinkoBoard({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
 
-      ctx.fillStyle = '#000514';
+      ctx.fillStyle = '#120D24';
       ctx.fillRect(0, 0, w, h);
       drawStoneBackground(ctx, w, h);
 
@@ -331,8 +331,8 @@ export default function PlinkoBoard({
         const alpha = (1 - age) * 0.5;
         const r = PIN_RADIUS + 8 + age * 5;
         const grd = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
-        grd.addColorStop(0, `rgba(14, 204, 104, ${alpha})`);
-        grd.addColorStop(1, 'rgba(14, 204, 104, 0)');
+        grd.addColorStop(0, `rgba(247, 147, 26, ${alpha})`);
+        grd.addColorStop(1, 'rgba(247, 147, 26, 0)');
         ctx.beginPath();
         ctx.arc(g.x, g.y, r, 0, Math.PI * 2);
         ctx.fillStyle = grd;
@@ -346,11 +346,11 @@ export default function PlinkoBoard({
         );
         const g = ctx.createRadialGradient(pin.x - 0.5, pin.y - 0.5, 0, pin.x, pin.y, PIN_RADIUS);
         if (isHit) {
-          g.addColorStop(0, 'rgba(14, 204, 104, 1)');
-          g.addColorStop(1, 'rgba(14, 204, 104, 0.6)');
+          g.addColorStop(0, 'rgba(247, 147, 26, 1)');
+          g.addColorStop(1, 'rgba(247, 147, 26, 0.6)');
         } else {
-          g.addColorStop(0, 'rgba(194, 197, 214, 0.6)');
-          g.addColorStop(1, 'rgba(115, 118, 140, 0.3)');
+          g.addColorStop(0, 'rgba(206, 202, 255, 0.65)');
+          g.addColorStop(1, 'rgba(139, 139, 163, 0.30)');
         }
         ctx.beginPath();
         ctx.arc(pin.x, pin.y, isHit ? PIN_RADIUS + 0.5 : PIN_RADIUS, 0, Math.PI * 2);
@@ -413,7 +413,7 @@ export default function PlinkoBoard({
         // Label
         const labelY = bucketTopY + cupH + 15;
         const fontSize = bw < 26 ? 7 : bw < 34 ? 8 : bw < 44 ? 9 : 10;
-        ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+        ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const label = mult >= 1000 ? `${(mult / 1000).toFixed(0)}K` : `${mult}X`;
@@ -463,14 +463,14 @@ export default function PlinkoBoard({
           if (sz <= 0) continue;
           ctx.beginPath();
           ctx.arc(dot.x, dot.y, sz, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(251, 206, 4, ${alpha})`;
+          ctx.fillStyle = `rgba(247, 147, 26, ${alpha})`;
           ctx.fill();
         }
 
         // Glow
         const glowG = ctx.createRadialGradient(x, y, BALL_RADIUS, x, y, BALL_RADIUS + 14);
-        glowG.addColorStop(0, 'rgba(251, 206, 4, 0.25)');
-        glowG.addColorStop(1, 'rgba(251, 206, 4, 0)');
+        glowG.addColorStop(0, 'rgba(247, 147, 26, 0.28)');
+        glowG.addColorStop(1, 'rgba(247, 147, 26, 0)');
         ctx.beginPath();
         ctx.arc(x, y, BALL_RADIUS + 14, 0, Math.PI * 2);
         ctx.fillStyle = glowG;
@@ -478,10 +478,10 @@ export default function PlinkoBoard({
 
         // Ball
         const bg = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, BALL_RADIUS);
-        bg.addColorStop(0, '#fff8dc');
-        bg.addColorStop(0.3, '#FBCE04');
-        bg.addColorStop(0.7, '#d4a904');
-        bg.addColorStop(1, '#8a6f02');
+        bg.addColorStop(0, '#ffe9cc');
+        bg.addColorStop(0.3, '#F7931A');
+        bg.addColorStop(0.7, '#d97a08');
+        bg.addColorStop(1, '#8a4c02');
         ctx.beginPath();
         ctx.arc(x, y, BALL_RADIUS, 0, Math.PI * 2);
         ctx.fillStyle = bg;
@@ -506,7 +506,7 @@ export default function PlinkoBoard({
         ctx.scale(scale, scale);
         ctx.globalAlpha = Math.max(0, alpha);
         const text = p.mult >= 1000 ? `${(p.mult / 1000).toFixed(0)}K` : `${p.mult}X`;
-        ctx.font = `bold ${p.mult >= 10 ? 16 : 13}px Inter, sans-serif`;
+        ctx.font = `bold ${p.mult >= 10 ? 16 : 13}px 'JetBrains Mono', monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const tmw = ctx.measureText(text).width;
@@ -554,7 +554,7 @@ function drawStoneBackground(ctx: CanvasRenderingContext2D, w: number, h: number
   for (let row = 0; row < Math.ceil(h / bH) + 1; row++) {
     const off = row % 2 === 0 ? 0 : bW / 2;
     for (let col = -1; col < Math.ceil(w / bW) + 1; col++) {
-      ctx.strokeStyle = '#73768C';
+      ctx.strokeStyle = '#8B8BA3';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.roundRect(col * bW + off + 2, row * bH + 2, bW - 4, bH - 4, 4);
@@ -563,8 +563,8 @@ function drawStoneBackground(ctx: CanvasRenderingContext2D, w: number, h: number
   }
   ctx.globalAlpha = 1;
   const vig = ctx.createRadialGradient(w / 2, h / 2, w * 0.15, w / 2, h / 2, w * 0.75);
-  vig.addColorStop(0, 'rgba(0,5,20,0)');
-  vig.addColorStop(1, 'rgba(0,5,20,0.55)');
+  vig.addColorStop(0, 'rgba(18,13,36,0)');
+  vig.addColorStop(1, 'rgba(18,13,36,0.55)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, w, h);
 }
