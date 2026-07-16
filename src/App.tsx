@@ -1,172 +1,265 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import PlinkoBoard from './components/PlinkoBoard';
-import BetPanel from './components/BetPanel';
-import InfoDrawer from './components/InfoDrawer';
+import SidePanel from './components/SidePanel';
+import { InfoDrawer, PfDrawer, HistoryDrawer, AutoDrawer } from './components/Drawers';
 import type { RiskLevel } from './utils/multipliers';
-import { getMultipliers, getMultiplierColor } from './utils/multipliers';
+import { getMultipliers } from './utils/multipliers';
 import { getPath, randomHex } from './utils/provablyFair';
 import { sound } from './utils/sound';
 
-export interface BetResult { id: number; mult: number; profit: number; color: string }
+export interface BetResult {
+  id: number; mult: number; profit: number; bet: number; pay: number; time: number; nonce: number;
+}
 
-const fmt = (n: number) =>
+export const fmt = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const BoltSVG = () => (
+  <svg className="hist-chip-bolt" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></svg>
+);
+
+const PlinkoIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="ico">
+    <circle cx="12" cy="4" r="2.2" fill="currentColor" />
+    <circle cx="8" cy="11" r="1.4" fill="currentColor" opacity="0.65" />
+    <circle cx="16" cy="11" r="1.4" fill="currentColor" opacity="0.65" />
+    <circle cx="4.5" cy="18" r="1.4" fill="currentColor" opacity="0.4" />
+    <circle cx="12" cy="18" r="1.4" fill="currentColor" opacity="0.4" />
+    <circle cx="19.5" cy="18" r="1.4" fill="currentColor" opacity="0.4" />
+  </svg>
+);
+
+const ClockSVG = () => (
+  <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+const ShieldSVG = () => (
+  <svg viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2"/></svg>
+);
+const SoundSVG = ({ on }: { on: boolean }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />{on && <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />}</svg>
+);
+const InfoSVG = () => (
+  <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><line x1="12" y1="11" x2="12" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="8" r="1" fill="currentColor"/></svg>
+);
+
 export default function App() {
+  const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState(10000);
-  const [betAmount, setBetAmount] = useState(1);
+  const [betStr, setBetStr] = useState('1.00');
   const [rows, setRows] = useState(16);
   const [risk, setRisk] = useState<RiskLevel>('high');
-  const [isAuto, setIsAuto] = useState(false);
-  const [autoBetCount, setAutoBetCount] = useState(10); // 0 = unlimited
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoRounds, setAutoRounds] = useState('10'); // '0' = unlimited
   const [autoPlayed, setAutoPlayed] = useState(0);
+  const [autoProfit, setAutoProfit] = useState(0);
   const [ballQueue, setBallQueue] = useState<number[]>([]);
   const [paths] = useState(() => new Map<number, number[]>());
   const [history, setHistory] = useState<BetResult[]>([]);
-  const [infoOpen, setInfoOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [pfOpen, setPfOpen] = useState(false);
+  const [histOpen, setHistOpen] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
+  const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
 
   const idRef = useRef(0);
   const nonceRef = useRef(0);
-  const sSeed = useRef(randomHex(32));
-  const cSeed = useRef(randomHex(16));
+  const [serverSeed, setServerSeed] = useState(() => randomHex(32));
+  const [clientSeed, setClientSeed] = useState(() => 'plinko_' + randomHex(6));
+  const seedRef = useRef({ s: serverSeed, c: clientSeed });
+  seedRef.current = { s: serverSeed, c: clientSeed };
   const autoRef = useRef(false);
-  const pending = useRef(new Map<number, number>());
+  const autoIds = useRef(new Set<number>());
+  const pending = useRef(new Map<number, { bet: number; nonce: number }>());
   const balanceRef = useRef(balance);
   balanceRef.current = balance;
+  const betRef = useRef(1);
+  betRef.current = Math.max(0, parseFloat(betStr) || 0);
+
+  useEffect(() => {
+    const tm = setTimeout(() => setLoading(false), 2200);
+    return () => clearTimeout(tm);
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const h = () => setMenuOpen(false);
+    document.addEventListener('click', h);
+    return () => document.removeEventListener('click', h);
+  }, [menuOpen]);
 
   const mults = getMultipliers(risk, rows);
 
-  const drop = useCallback(async () => {
-    if (balanceRef.current < betAmount || betAmount <= 0) return false;
-    setBalance(p => p - betAmount);
+  const drop = useCallback(async (isAuto = false) => {
+    const bet = betRef.current;
+    if (balanceRef.current < bet || bet <= 0) return false;
+    setBalance(p => p - bet);
     const id = ++idRef.current;
-    const dirs = await getPath(sSeed.current, cSeed.current, ++nonceRef.current, rows);
+    const nonce = ++nonceRef.current;
+    const dirs = await getPath(seedRef.current.s, seedRef.current.c, nonce, rows);
     paths.set(id, dirs);
-    pending.current.set(id, betAmount);
+    pending.current.set(id, { bet, nonce });
+    if (isAuto) autoIds.current.add(id);
     setBallQueue(p => [...p, id]);
     return true;
-  }, [betAmount, rows, paths]);
+  }, [rows, paths]);
 
   const onLand = useCallback((idx: number) => {
     const m = getMultipliers(risk, rows)[idx];
-    if (!m) return;
+    if (m == null) return;
     const e = Array.from(pending.current.entries());
     if (!e.length) return;
-    const [bid, bet] = e[0];
+    const [bid, { bet, nonce }] = e[0];
     pending.current.delete(bid);
     const pay = +(bet * m).toFixed(2);
     setBalance(p => p + pay);
     sound.land(m);
-    setHistory(p => [{ id: bid, mult: m, profit: pay - bet, color: getMultiplierColor(m) }, ...p].slice(0, 30));
+    if (autoIds.current.has(bid)) {
+      autoIds.current.delete(bid);
+      setAutoProfit(p => +(p + pay - bet).toFixed(2));
+    }
+    setHistory(p => [{ id: bid, mult: m, profit: pay - bet, bet, pay, time: Date.now(), nonce }, ...p].slice(0, 50));
   }, [risk, rows]);
 
   const onConsumed = useCallback((id: number) => setBallQueue(p => p.filter(x => x !== id)), []);
 
+  const stopAuto = useCallback(() => { autoRef.current = false; setAutoRunning(false); }, []);
+
   const startAuto = useCallback(() => {
-    autoRef.current = true; setIsAuto(true); setAutoPlayed(0);
-    const total = autoBetCount || Infinity;
+    autoRef.current = true; setAutoRunning(true); setAutoPlayed(0); setAutoProfit(0);
+    const total = parseInt(autoRounds) || (autoRounds === '0' ? Infinity : 10);
+    const limit = autoRounds === '0' ? Infinity : total;
     let c = 0;
     const tick = async () => {
-      if (!autoRef.current || c >= total) { autoRef.current = false; setIsAuto(false); return; }
-      const ok = await drop();
-      if (!ok) { autoRef.current = false; setIsAuto(false); return; }
+      if (!autoRef.current || c >= limit) { stopAuto(); return; }
+      const ok = await drop(true);
+      if (!ok) { stopAuto(); return; }
       c++; setAutoPlayed(c);
       setTimeout(tick, 400);
     };
     tick();
-  }, [drop, autoBetCount]);
+  }, [drop, autoRounds, stopAuto]);
 
-  const stopAuto = useCallback(() => { autoRef.current = false; setIsAuto(false); }, []);
+  const rotateSeed = useCallback(() => {
+    const next = randomHex(32);
+    setServerSeed(next);
+    nonceRef.current = 0;
+    return next;
+  }, []);
+
+  const handleSoundToggle = () => setSoundOn(sound.toggle());
+
+  const totalAutoRounds = autoRounds === '0' ? '∞' : autoRounds;
+
+  if (loading) return (
+    <div className="loading-screen">
+      <div className="loading-content">
+        <PlinkoIcon size={44} />
+        <h1 style={{ fontSize: 24, fontWeight: 900, color: '#FFFFFF', margin: '12px 0 4px', letterSpacing: 1 }}>Plinko</h1>
+        <div className="loading-bar-wrap"><div className="loading-bar" /></div>
+        <p className="loading-text">Loading game…</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="h-dvh flex flex-col select-none overflow-hidden bg-[var(--board)] text-white">
-      {/* ===== Header (RGS parity) ===== */}
-      <header className="h-[50px] shrink-0 flex items-center justify-between px-5 max-[560px]:px-3 bg-[var(--panel)] border-b border-[var(--hairline)] z-10">
-        <div className="flex items-center gap-2">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-[var(--accent)]">
-            <circle cx="12" cy="4" r="2.2" fill="currentColor" />
-            <circle cx="8" cy="11" r="1.4" fill="currentColor" opacity="0.65" />
-            <circle cx="16" cy="11" r="1.4" fill="currentColor" opacity="0.65" />
-            <circle cx="4.5" cy="18" r="1.4" fill="currentColor" opacity="0.4" />
-            <circle cx="12" cy="18" r="1.4" fill="currentColor" opacity="0.4" />
-            <circle cx="19.5" cy="18" r="1.4" fill="currentColor" opacity="0.4" />
-          </svg>
-          <span className="text-[14px] font-bold tracking-[0.02em]">Plinko</span>
-        </div>
-
-        <div className="flex items-center gap-1 ml-auto mr-2">
-          <span className="text-[14px] font-bold text-[var(--accent)]">$</span>
-          <span className="text-[14px] font-bold mono">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setSoundOn(sound.toggle())}
-            title="Sound"
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--toggle-border)] text-[var(--text-mid)] hover:text-white hover:border-[var(--accent-border)] hover:bg-white/[0.04] transition-all"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              {soundOn && <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />}
-            </svg>
-          </button>
-          <button
-            onClick={() => setInfoOpen(true)}
-            title="How to Play"
-            className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--toggle-border)] text-[var(--text-mid)] text-[13px] font-bold hover:text-white hover:border-[var(--accent-border)] hover:bg-white/[0.04] transition-all"
-          >i</button>
-        </div>
-      </header>
-
-      {/* ===== Row: side controls + board ===== */}
-      <div className="flex flex-1 min-h-0 overflow-hidden max-[860px]:flex-col">
-        <aside className="w-[340px] shrink-0 bg-[var(--panel)] border-r border-[var(--hairline)] p-4 flex flex-col gap-2.5 overflow-y-auto
-          max-[1168px]:w-[300px]
-          max-[860px]:order-2 max-[860px]:w-full max-[860px]:border-r-0 max-[860px]:border-t max-[860px]:border-[var(--hairline)] max-[860px]:px-3.5 max-[860px]:py-2.5 max-[860px]:gap-2 max-[860px]:overflow-visible">
-          <BetPanel
-            balance={balance}
-            betAmount={betAmount}
-            setBetAmount={setBetAmount}
-            rows={rows}
-            setRows={setRows}
-            risk={risk}
-            setRisk={setRisk}
-            isAuto={isAuto}
-            autoBetCount={autoBetCount}
-            setAutoBetCount={setAutoBetCount}
-            autoPlayed={autoPlayed}
-            onDrop={() => { void drop(); }}
-            onStartAuto={startAuto}
-            onStopAuto={stopAuto}
-            canBet={balance >= betAmount && betAmount > 0}
-          />
-        </aside>
-
-        <main className="flex-1 min-w-0 min-h-0 flex flex-col max-[860px]:order-1">
-          {/* Recent results strip (limbo/hilo history-bar parity) */}
-          <div className="h-11 shrink-0 flex items-center gap-1.5 px-4 overflow-x-auto max-[560px]:h-9 max-[560px]:px-2">
-            {history.length === 0 ? (
-              <span className="text-[11px] text-[var(--text-dim)] font-semibold uppercase tracking-wide">No results yet</span>
-            ) : history.map((r, i) => (
-              <div
-                key={r.id}
-                className={`h-6 px-2 shrink-0 rounded-md text-[11px] font-bold mono flex items-center ${i === 0 ? 'anim-slide' : ''}`}
-                style={{ background: `${r.color}1e`, color: r.color, border: `1px solid ${r.color}30` }}
-              >
-                {r.mult}x
-              </div>
-            ))}
+    <>
+      <div className={`app${autoRunning ? ' auto-running' : ''}`}>
+        <div className="header">
+          <div className="header-left">
+            <div className="game-name">
+              <PlinkoIcon />
+              <span>Plinko</span>
+            </div>
           </div>
-
-          <div className="flex-1 min-h-0">
-            <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
-              ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
+          <div className="header-bal">
+            <span className="header-bal-icon">$</span>
+            <span className="header-bal-value">{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-        </main>
+          <div className="header-right">
+            <button className="hdr-btn hdr-desktop" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
+            <button className="hdr-btn hdr-desktop" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
+            <button className="hdr-btn hdr-desktop" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
+            <button className="hdr-btn hdr-desktop hdr-info" onClick={() => setInfoOpen(true)} title="How to Play">i</button>
+            <button className="hdr-btn hdr-mobile" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
+            <button className="hdr-btn hdr-mobile hdr-dots" onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} title="Menu">
+              <svg viewBox="0 0 20 12" fill="none" width="16" height="10"><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="6" r="1.5" fill="currentColor"/></svg>
+              {menuOpen && (
+                <div className="dots-menu open" onClick={(e) => e.stopPropagation()}>
+                  <div className="dots-menu-item" onClick={() => { setPfOpen(true); setMenuOpen(false); }}><ShieldSVG /> Fair Play</div>
+                  <div className="dots-menu-item" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}><InfoSVG /> How to Play</div>
+                  <div className="dots-menu-item" onClick={() => { handleSoundToggle(); setMenuOpen(false); }}><SoundSVG on={soundOn} /> {soundOn ? 'Sound: On' : 'Sound: Off'}</div>
+                </div>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="row">
+          <aside className="side">
+            <SidePanel
+              balance={balance}
+              betStr={betStr}
+              setBetStr={setBetStr}
+              rows={rows}
+              setRows={setRows}
+              risk={risk}
+              setRisk={setRisk}
+              autoRunning={autoRunning}
+              autoPlayed={autoPlayed}
+              autoProfit={autoProfit}
+              totalAutoRounds={totalAutoRounds}
+              onDrop={() => { void drop(); }}
+              onStopAuto={stopAuto}
+              onOpenAuto={() => setAutoOpen(true)}
+            />
+          </aside>
+
+          <main className="main">
+            <div className="history-bar">
+              {history.length === 0 ? (
+                <span className="history-empty">No games yet</span>
+              ) : history.slice(0, 8).map(h => (
+                <span key={h.id} className={`history-chip ${h.profit >= 0 ? 'hc-win' : 'hc-lose'}`}>
+                  <BoltSVG />
+                  {h.mult.toFixed(2)}x
+                </span>
+              ))}
+            </div>
+
+            <div className="game-area">
+              <PlinkoBoard rows={rows} multipliers={mults} onBallLand={onLand}
+                ballQueue={ballQueue} onBallConsumed={onConsumed} paths={paths} />
+            </div>
+          </main>
+        </div>
+
+        <div className="bottom">
+          <div className="bottom-icons">
+            <div className={`ic${faved ? ' faved' : ''}`} title="Favorite" onClick={() => { const next = !faved; setFaved(next); localStorage.setItem('fav_plinko', String(next)); }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={faved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+          </div>
+          <div className="bottom-logo">MYBC</div>
+        </div>
       </div>
 
-      <InfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} fmt={fmt} />
-    </div>
+      <InfoDrawer open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <PfDrawer
+        open={pfOpen} onClose={() => setPfOpen(false)}
+        serverSeed={serverSeed} clientSeed={clientSeed}
+        setClientSeed={setClientSeed} onRotate={rotateSeed}
+      />
+      <HistoryDrawer open={histOpen} onClose={() => setHistOpen(false)} rounds={history} />
+      <AutoDrawer
+        open={autoOpen} onClose={() => setAutoOpen(false)}
+        autoRounds={autoRounds} setAutoRounds={setAutoRounds}
+        bet={betRef.current} rows={rows} risk={risk}
+        autoRunning={autoRunning} onStart={startAuto}
+      />
+    </>
   );
 }

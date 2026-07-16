@@ -12,8 +12,10 @@ interface PlinkoBoardProps {
   paths: Map<number, number[]>;
 }
 
-const PIN_RADIUS = 4;
-const BALL_RADIUS = 7;
+// Radii scale with pin spacing so balls always fit between pins,
+// whatever size the board area gets.
+const pinRadiusFor = (gap: number) => Math.max(2.5, Math.min(4, gap * 0.14));
+const ballRadiusFor = (gap: number) => Math.max(4.5, Math.min(7, gap * 0.24));
 
 interface PinGlow { x: number; y: number; time: number }
 interface TrailDot { x: number; y: number; time: number }
@@ -77,7 +79,10 @@ export default function PlinkoBoard({
     const topLeftX = (w - topTotalW) / 2;
     const topRightX = topLeftX + topTotalW;
 
-    return { gap, startY, endY, pins, bottomLeftX, bottomRightX, topLeftX, topRightX };
+    return {
+      gap, startY, endY, pins, bottomLeftX, bottomRightX, topLeftX, topRightX,
+      pinR: pinRadiusFor(gap), ballR: ballRadiusFor(gap),
+    };
   }, [rows]);
 
   // Engine
@@ -111,19 +116,19 @@ export default function PlinkoBoard({
     const h = canvas.height / (window.devicePixelRatio || 1);
     sizeRef.current = { w, h };
     const geo = getGeometry(w, h);
-    const { pins, endY, gap, topLeftX, topRightX, bottomLeftX, bottomRightX, startY } = geo;
+    const { pins, endY, gap, topLeftX, topRightX, bottomLeftX, bottomRightX, startY, pinR, ballR } = geo;
 
     // Pins
     pins.forEach(p => {
       Matter.Composite.add(engine.world,
-        Matter.Bodies.circle(p.x, p.y, PIN_RADIUS + 1.5, {
+        Matter.Bodies.circle(p.x, p.y, pinR + 1, {
           isStatic: true, restitution: 0.5, friction: 0.0, label: `pin-${p.row}-${p.col}`,
         })
       );
     });
 
     // Angled boundary walls along triangle edges (keeps balls inside)
-    const wallPadding = BALL_RADIUS + 5;
+    const wallPadding = ballR + 5;
     const wallThickness = 10;
 
     // Left wall: from top-left pin to bottom-left pin
@@ -284,14 +289,14 @@ export default function PlinkoBoard({
     const engine = engineRef.current;
     if (!engine) return;
     const { w, h } = sizeRef.current;
-    const { startY } = getGeometry(w, h);
+    const { startY, ballR } = getGeometry(w, h);
 
     ballQueue.forEach(id => {
       const dirs = paths.get(id) || [];
       const ball = Matter.Bodies.circle(
         w / 2 + (Math.random() - 0.5) * 4,
         startY - 20,
-        BALL_RADIUS,
+        ballR,
         { restitution: 0.4, friction: 0.05, density: 0.003, label: `ball-${id}` }
       );
       Matter.Body.setVelocity(ball, { x: 0, y: 1.5 });
@@ -321,7 +326,7 @@ export default function PlinkoBoard({
       drawStoneBackground(ctx, w, h);
 
       const geo = getGeometry(w, h);
-      const { pins, gap, endY, bottomLeftX, bottomRightX } = geo;
+      const { pins, gap, endY, bottomLeftX, bottomRightX, pinR, ballR } = geo;
       const now = Date.now();
 
       // Pin glows
@@ -329,7 +334,7 @@ export default function PlinkoBoard({
       pinGlowsRef.current.forEach(g => {
         const age = (now - g.time) / 250;
         const alpha = (1 - age) * 0.5;
-        const r = PIN_RADIUS + 8 + age * 5;
+        const r = pinR + 8 + age * 5;
         const grd = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, r);
         grd.addColorStop(0, `rgba(247, 147, 26, ${alpha})`);
         grd.addColorStop(1, 'rgba(247, 147, 26, 0)');
@@ -344,7 +349,7 @@ export default function PlinkoBoard({
         const isHit = pinGlowsRef.current.some(g =>
           Math.abs(g.x - pin.x) < 2 && Math.abs(g.y - pin.y) < 2
         );
-        const g = ctx.createRadialGradient(pin.x - 0.5, pin.y - 0.5, 0, pin.x, pin.y, PIN_RADIUS);
+        const g = ctx.createRadialGradient(pin.x - 0.5, pin.y - 0.5, 0, pin.x, pin.y, pinR);
         if (isHit) {
           g.addColorStop(0, 'rgba(247, 147, 26, 1)');
           g.addColorStop(1, 'rgba(247, 147, 26, 0.6)');
@@ -353,7 +358,7 @@ export default function PlinkoBoard({
           g.addColorStop(1, 'rgba(139, 139, 163, 0.30)');
         }
         ctx.beginPath();
-        ctx.arc(pin.x, pin.y, isHit ? PIN_RADIUS + 0.5 : PIN_RADIUS, 0, Math.PI * 2);
+        ctx.arc(pin.x, pin.y, isHit ? pinR + 0.5 : pinR, 0, Math.PI * 2);
         ctx.fillStyle = g;
         ctx.fill();
       });
@@ -459,7 +464,7 @@ export default function PlinkoBoard({
           const age = (now - dot.time) / 120;
           if (age > 1) continue;
           const alpha = (1 - age) * 0.2 * (t / trail.length);
-          const sz = BALL_RADIUS * (1 - age) * 0.5;
+          const sz = ballR * (1 - age) * 0.5;
           if (sz <= 0) continue;
           ctx.beginPath();
           ctx.arc(dot.x, dot.y, sz, 0, Math.PI * 2);
@@ -468,28 +473,28 @@ export default function PlinkoBoard({
         }
 
         // Glow
-        const glowG = ctx.createRadialGradient(x, y, BALL_RADIUS, x, y, BALL_RADIUS + 14);
+        const glowG = ctx.createRadialGradient(x, y, ballR, x, y, ballR + 14);
         glowG.addColorStop(0, 'rgba(247, 147, 26, 0.28)');
         glowG.addColorStop(1, 'rgba(247, 147, 26, 0)');
         ctx.beginPath();
-        ctx.arc(x, y, BALL_RADIUS + 14, 0, Math.PI * 2);
+        ctx.arc(x, y, ballR + 14, 0, Math.PI * 2);
         ctx.fillStyle = glowG;
         ctx.fill();
 
         // Ball
-        const bg = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, BALL_RADIUS);
+        const bg = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, ballR);
         bg.addColorStop(0, '#ffe9cc');
         bg.addColorStop(0.3, '#F7931A');
         bg.addColorStop(0.7, '#d97a08');
         bg.addColorStop(1, '#8a4c02');
         ctx.beginPath();
-        ctx.arc(x, y, BALL_RADIUS, 0, Math.PI * 2);
+        ctx.arc(x, y, ballR, 0, Math.PI * 2);
         ctx.fillStyle = bg;
         ctx.fill();
 
         // Specular
         ctx.beginPath();
-        ctx.arc(x - 2, y - 2.5, BALL_RADIUS * 0.28, 0, Math.PI * 2);
+        ctx.arc(x - 2, y - 2.5, ballR * 0.28, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
         ctx.fill();
       });
