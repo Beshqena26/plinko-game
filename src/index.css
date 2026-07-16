@@ -106,21 +106,148 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .dots-menu-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
 .dots-menu-item svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-/* ===== ROW / SIDE / MAIN ===== */
+/* ===== ROW / MAIN ===== */
 .row { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; }
-.side {
-  width: 340px; flex-shrink: 0;
-  background: var(--panel);
-  border-right: 1px solid var(--hairline);
-  padding: 16px;
-  display: flex; flex-direction: column; gap: 10px;
-  overflow-y: auto;
-}
-.side::-webkit-scrollbar { width: 3px; }
-.side::-webkit-scrollbar-track { background: transparent; }
-.side::-webkit-scrollbar-thumb { background: rgba(145,159,192,0.12); border-radius: 2px; }
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 .game-area { flex: 1; min-height: 0; position: relative; }
+
+/* ===== BGaming-style Lines rail (rows selector on the board edge) ===== */
+.lines-rail {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 2px; z-index: 20;
+}
+.lines-rail-label {
+  font-size: 10px; font-weight: 700; color: var(--text-mid);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  text-align: center; margin-bottom: 3px;
+}
+.lines-rail-btn {
+  width: 34px; height: 24px;
+  background: rgba(35, 32, 78, 0.85); border: 1px solid var(--hairline);
+  color: var(--text-mid); font-size: 11px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent;
+}
+.lines-rail-btn:first-of-type { border-radius: 7px 7px 0 0; }
+.lines-rail-btn:last-of-type { border-radius: 0 0 7px 7px; }
+.lines-rail-btn:hover:not(:disabled) { color: var(--text); background: var(--elevated); }
+.lines-rail-btn.active {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.lines-rail.locked { opacity: 0.55; }
+.lines-rail-btn:disabled { cursor: not-allowed; }
+
+/* ===== BGaming-style control cluster ===== */
+.bgc {
+  flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 4px 14px calc(10px + env(safe-area-inset-bottom));
+  gap: 6px;
+}
+.bgc-main {
+  display: flex; align-items: center; justify-content: center;
+  gap: 14px;
+}
+.bgc-card {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--panel); border: 1px solid var(--hairline);
+  border-radius: 12px; padding: 8px;
+  min-width: 118px;
+}
+.bgc-card-label {
+  font-size: 10px; font-weight: 700; color: var(--text-mid);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  text-align: center; margin-bottom: 1px;
+}
+.bgc-opt {
+  display: flex; align-items: center; gap: 7px;
+  height: 27px; padding: 0 9px;
+  background: var(--board); border: 1px solid var(--hairline); border-radius: 8px;
+  color: var(--text-75); font-size: 12px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent;
+}
+.bgc-opt:hover:not(:disabled) { color: var(--text); }
+.bgc-opt:disabled { opacity: 0.55; cursor: not-allowed; }
+.bgc-opt.active { font-weight: 700; }
+.bgc-opt.active-mode {
+  background: var(--accent-glow); border-color: var(--accent-border);
+  color: var(--text); font-weight: 700;
+}
+.bgc-opt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; opacity: 0.9; }
+.bgc-opt-ico {
+  width: 16px; height: 16px; border-radius: 5px; flex-shrink: 0;
+  background: var(--accent); color: #fff;
+  font-size: 9px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+.bgc-opt-ico--a { background: var(--green); }
+
+/* Big round PLAY button (BGaming signature) */
+.play-btn {
+  width: 104px; height: 104px; border-radius: 50%;
+  border: none; cursor: pointer; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-family: inherit;
+  background:
+    radial-gradient(circle at 34% 30%, rgba(255,255,255,0.35), rgba(255,255,255,0) 46%),
+    linear-gradient(145deg, #F7931A 0%, #E67A00 60%, #c96500 100%);
+  color: #fff;
+  box-shadow:
+    0 0 0 5px rgba(247,147,26,0.25),
+    0 0 0 6px rgba(247,147,26,0.45),
+    0 10px 30px rgba(247,147,26,0.35),
+    inset 0 2px 2px rgba(255,255,255,0.35);
+  transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.play-btn:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
+.play-btn:active:not(:disabled) { transform: scale(0.96); }
+.play-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.play-btn-label { font-size: 21px; font-weight: 900; letter-spacing: 0.06em; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+.play-btn-sub { font-size: 9px; font-weight: 600; opacity: 0.9; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+.play-btn.stop {
+  background:
+    radial-gradient(circle at 34% 30%, rgba(255,255,255,0.3), rgba(255,255,255,0) 46%),
+    linear-gradient(145deg, #F85F5D 0%, #e04442 60%, #b93634 100%);
+  box-shadow:
+    0 0 0 5px rgba(248,95,93,0.22),
+    0 0 0 6px rgba(248,95,93,0.42),
+    0 10px 30px rgba(248,95,93,0.32),
+    inset 0 2px 2px rgba(255,255,255,0.3);
+}
+.play-btn.stop .play-btn-label { font-size: 17px; }
+
+/* Bet stepper row: Min | − | Bet $x.xx | + | Max */
+.bgc-bet-row {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: min(440px, 100%);
+}
+.bgc-bet-side { display: flex; gap: 4px; flex: 1; }
+.bgc-bet-side:last-child { justify-content: flex-end; }
+.bgc-pill {
+  height: 30px; min-width: 44px; padding: 0 10px;
+  background: var(--panel); border: 1px solid var(--hairline); border-radius: 8px;
+  color: var(--text-75); font-size: 12px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent;
+}
+.bgc-pill:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-border); }
+.bgc-pill:active:not(:disabled) { transform: scale(0.95); }
+.bgc-pill:disabled { opacity: 0.4; cursor: not-allowed; }
+.bgc-bet-display {
+  display: flex; align-items: baseline; gap: 7px;
+  font-size: 16px; font-weight: 800; color: var(--text);
+  cursor: text; white-space: nowrap;
+}
+.bgc-bet-display span { font-size: 13px; font-weight: 700; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.03em; }
+.bgc-bet-display input {
+  width: 86px; background: none; border: none; outline: none;
+  color: var(--accent); font-size: 17px; font-weight: 800; text-align: center;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed rgba(247,147,26,0.4);
+}
+.bgc-bet-display input:disabled { opacity: 0.5; }
+.bgc-balance { font-size: 12px; font-weight: 600; color: var(--text-mid); }
+.bgc-balance b { color: var(--text); font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
 
 /* ===== HISTORY BAR ===== */
 .history-bar {
@@ -146,8 +273,6 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* ===== STAKE / BET CONTROLS ===== */
 .field { display: flex; flex-direction: column; gap: 6px; }
 .risk-label { font-size: 11px; font-weight: 600; color: var(--text-mid); text-transform: uppercase; letter-spacing: 0.04em; }
-.stake-bet { display: flex; gap: 6px; width: 100%; align-items: stretch; }
-.stake-left { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .stake-input { display: flex; align-items: center; gap: 0; background: var(--board); border: 1px solid var(--hairline); border-radius: 10px; height: 38px; overflow: hidden; }
 .stake-input:focus-within { border-color: var(--accent-border); }
 .stake-pm { width: 36px; height: 100%; background: none; border: none; color: var(--text-mid); font-size: 18px; font-weight: 400; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.12s; -webkit-tap-highlight-color: transparent; }
@@ -168,56 +293,6 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .stake-chip--inf { font-size: 16px; line-height: 1; }
 .auto-rounds-chips { margin-top: 8px; }
 
-/* Risk + Rows on one compact row (plinko-specific) */
-.field-row { display: flex; gap: 8px; }
-.field-row .field { flex: 1; min-width: 0; }
-.field-row .field-rows { flex: 0 0 122px; }
-.risk-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
-.risk-btn {
-  height: 38px; background: var(--board); border: 1px solid var(--hairline); border-radius: 8px;
-  color: var(--text-mid); font-size: 12px; font-weight: 700; cursor: pointer;
-  transition: all 0.12s; font-family: inherit; -webkit-tap-highlight-color: transparent;
-}
-.risk-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-/* BET / STOP AUTO beside the stake column */
-.place-btn {
-  border: none; border-radius: 10px;
-  background: var(--accent);
-  color: #fff; font-family: inherit; font-weight: 800; font-size: 15px;
-  cursor: pointer; transition: all 0.2s;
-  white-space: nowrap;
-  -webkit-tap-highlight-color: transparent;
-}
-.place-btn:hover:not(:disabled) { filter: brightness(1.08); }
-.place-btn:active:not(:disabled) { transform: translateY(0); }
-.place-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: none; transform: none; }
-.stake-bet .place-btn, .stake-bet .auto-stop-bet-btn {
-  flex: 0 0 42%; height: auto; align-self: stretch;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-}
-.stake-bet-label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.1; }
-.stake-bet-amount { font-size: 15px; font-weight: 800; color: #fff; line-height: 1.1; font-family: 'JetBrains Mono', monospace; }
-.stake-bet .auto-stop-bet-btn {
-  display: none;
-  border: none; border-radius: 10px;
-  background: var(--red); color: #fff;
-  font-family: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.app.auto-running .stake-bet .place-btn { display: none; }
-.app.auto-running .stake-bet .auto-stop-bet-btn { display: flex; }
-.auto-stop-label { font-size: 14px; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; }
-.auto-stop-sub { font-size: 10px; font-weight: 500; color: #fff; opacity: 0.75; font-variant-numeric: tabular-nums; font-family: 'JetBrains Mono', monospace; }
-
-.auto-open-btn {
-  display: flex; align-items: center; justify-content: center; gap: 6px;
-  height: 32px; width: 100%; border: 1px solid var(--accent-border); border-radius: 8px;
-  background: var(--accent-glow); color: var(--text); font-family: inherit;
-  font-weight: 700; font-size: 11px; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent;
-}
-.auto-open-btn svg { width: 15px; height: 15px; }
-.auto-open-btn:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
-.auto-open-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .auto-drawer-start { height: 46px; }
 
 /* ===== BOTTOM BAR ===== */
@@ -537,31 +612,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
 }
 
-/* ===== DESKTOP: controls as a floating card at bottom-center ===== */
-@media (min-width: 861px) {
-  .row { position: relative; }
-  .main { padding-bottom: 224px; }
-  .side {
-    position: absolute; left: 0; right: 0; bottom: 14px; margin: 0 auto;
-    width: min(480px, 90%); height: auto;
-    flex-direction: column; align-items: stretch; gap: 6px;
-    padding: 8px 10px;
-    background: rgba(30, 24, 69, 0.92);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--hairline);
-    border-radius: 12px; z-index: 40; overflow: visible;
-  }
-}
-
 /* ===== MOBILE ≤860px ===== */
 @media (max-width: 860px) {
-  .row { flex-direction: column; }
-  .main { order: 1; flex: 1; min-height: 0; width: 100%; }
-  .side {
-    order: 2; flex: none; width: 100%;
-    border-right: none; border-top: 1px solid var(--hairline);
-    padding: 10px 16px; gap: 8px; overflow: visible;
-  }
   .hdr-desktop { display: none; }
   .hdr-mobile { display: flex; }
   .bottom { display: none; }
@@ -569,5 +621,15 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 @media (max-width: 560px) {
   .header { padding: 0 10px; height: 44px; }
-  .side { padding: 8px 12px 10px; }
+  /* Cluster scales down but keeps the identical BGaming arrangement */
+  .bgc-main { gap: 8px; }
+  .bgc-card { min-width: 96px; padding: 6px; }
+  .bgc-opt { height: 25px; font-size: 11px; padding: 0 7px; }
+  .play-btn { width: 86px; height: 86px; }
+  .play-btn-label { font-size: 17px; }
+  .play-btn.stop .play-btn-label { font-size: 14px; }
+  .bgc-pill { min-width: 38px; height: 28px; font-size: 11px; padding: 0 8px; }
+  .bgc-bet-display input { width: 72px; font-size: 15px; }
+  .lines-rail { right: 4px; }
+  .lines-rail-btn { width: 28px; height: 21px; font-size: 10px; }
 }

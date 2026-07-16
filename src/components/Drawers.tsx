@@ -4,7 +4,7 @@ import { fmt } from '../App';
 import type { RiskLevel } from '../utils/multipliers';
 import { getRtp } from '../utils/multipliers';
 import { sha256, randomHex, getPath } from '../utils/provablyFair';
-import { MIN_BET, MAX_BET } from './SidePanel';
+import { MIN_BET, MAX_BET } from './BgControls';
 
 const CloseSVG = () => (
   <svg viewBox="0 0 20 20" fill="none"><path d="M5 5L15 15M15 5L5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>

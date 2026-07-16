@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import PlinkoBoard from './components/PlinkoBoard';
-import SidePanel from './components/SidePanel';
+import BgControls from './components/BgControls';
 import { InfoDrawer, PfDrawer, HistoryDrawer, AutoDrawer } from './components/Drawers';
 import type { RiskLevel } from './utils/multipliers';
 import { getMultipliers, getBucketColor } from './utils/multipliers';
@@ -118,26 +118,6 @@ export default function App() {
         </div>
 
         <div className="row">
-          <aside className="side">
-            <SidePanel
-              balance={game.balance}
-              betStr={game.betStr}
-              setBetStr={game.setBetStr}
-              rows={rows}
-              setRows={setRows}
-              risk={risk}
-              setRisk={setRisk}
-              autoRunning={game.autoRunning}
-              ballsInFlight={game.ballsInFlight}
-              autoPlayed={game.autoPlayed}
-              autoProfit={game.autoProfit}
-              totalAutoRounds={totalAutoRounds}
-              onDrop={() => { void game.drop(); }}
-              onStopAuto={game.stopAuto}
-              onOpenAuto={() => setAutoOpen(true)}
-            />
-          </aside>
-
           <main className="main">
             {/* Recent results — Stake practice: chips colored by the landed
                 bucket, newest first, click opens the round history. */}
@@ -163,7 +143,37 @@ export default function App() {
             <div className="game-area">
               <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
                 ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
+
+              {/* BGaming-style Lines rail: rows selector on the board edge */}
+              <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
+                <span className="lines-rail-label">Lines</span>
+                {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => (
+                  <button
+                    key={n}
+                    className={`lines-rail-btn${rows === n ? ' active' : ''}`}
+                    onClick={() => setRows(n)}
+                    disabled={game.ballsInFlight > 0 || game.autoRunning}
+                  >{n}</button>
+                ))}
+              </div>
             </div>
+
+            {/* BGaming-style control cluster — identical desktop & mobile */}
+            <BgControls
+              balance={game.balance}
+              betStr={game.betStr}
+              setBetStr={game.setBetStr}
+              risk={risk}
+              setRisk={setRisk}
+              autoRunning={game.autoRunning}
+              ballsInFlight={game.ballsInFlight}
+              autoPlayed={game.autoPlayed}
+              autoProfit={game.autoProfit}
+              totalAutoRounds={totalAutoRounds}
+              onDrop={() => { void game.drop(); }}
+              onStopAuto={game.stopAuto}
+              onOpenAuto={() => setAutoOpen(true)}
+            />
           </main>
         </div>
 
