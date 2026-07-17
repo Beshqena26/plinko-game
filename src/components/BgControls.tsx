@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import { fmt } from '../utils/format';
 
-import { MIN_BET, MAX_BET, BET_STEPS } from '../game/betting';
+import { MIN_BET, MAX_BET, BET_STEPS, clampBetToBalance } from '../game/betting';
 export { MIN_BET, MAX_BET };
 
 // Number-of-bets ladder for auto mode ('0' renders as ∞).
@@ -62,6 +62,9 @@ export default function BgControls({
   const betLocked = autoRunning; // bet edits are safe mid-flight (per-ball snapshot)
   const bet = Math.max(0, parseFloat(betStr) || 0);
   const remaining = totalAutoRounds === '∞' ? '∞' : String(Math.max(0, parseInt(totalAutoRounds) - autoPlayed));
+  // Highest ladder step the balance can cover — Max and + never exceed it,
+  // so the shown bet is always actually playable.
+  const affordableMax = Math.min(MAX_BET, clampBetToBalance(MAX_BET, balance));
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -77,7 +80,7 @@ export default function BgControls({
 
   const stepBet = (dir: 1 | -1) => {
     const next = dir === 1
-      ? BET_STEPS.find(s => s > bet + 1e-9)
+      ? BET_STEPS.find(s => s > bet + 1e-9 && s <= affordableMax)
       : [...BET_STEPS].reverse().find(s => s < bet - 1e-9);
     if (next != null) setBetStr(next.toFixed(2));
   };
@@ -135,7 +138,7 @@ export default function BgControls({
               onClick={() => setMode('manual')}
               disabled={locked}
             >
-              <span className="bgc-ico bgc-ico--chip"><b style={{ color: '#7C5CD6' }}>M</b></span>
+              <span className="bgc-ico"><b style={{ color: '#A78BFA' }}>M</b></span>
               Manual
             </button>
             <button
@@ -143,7 +146,7 @@ export default function BgControls({
               onClick={() => setMode('auto')}
               disabled={locked}
             >
-              <span className="bgc-ico bgc-ico--chip"><b style={{ color: '#E9375B' }}>A</b></span>
+              <span className="bgc-ico"><b style={{ color: '#F43F5E' }}>A</b></span>
               Auto
             </button>
             {mode === 'auto' && (
@@ -170,8 +173,8 @@ export default function BgControls({
           <b>{fmt(bet)}</b>
         </div>
         <div className="bgc-bet-side">
-          <button className="bgc-pill" disabled={betLocked || bet >= MAX_BET} onClick={() => stepBet(1)}>+</button>
-          <button className="bgc-pill" disabled={betLocked || bet >= MAX_BET} onClick={() => setBetStr(MAX_BET.toFixed(2))}>Max</button>
+          <button className="bgc-pill" disabled={betLocked || bet >= affordableMax} onClick={() => stepBet(1)}>+</button>
+          <button className="bgc-pill" disabled={betLocked || Math.abs(bet - affordableMax) < 1e-9} onClick={() => setBetStr(affordableMax.toFixed(2))}>Max</button>
         </div>
       </div>
 

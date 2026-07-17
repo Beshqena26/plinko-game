@@ -16,6 +16,9 @@ export interface BoardGeometry {
   bucketTopY: number;
   pinR: number;
   ballR: number;
+  /* True when the pin gap is too narrow for horizontal bucket labels — chips
+     grow tall and their labels render rotated 90°. */
+  verticalLabels: boolean;
 }
 
 // Radii scale with pin spacing so balls always fit between pins, whatever
@@ -36,11 +39,21 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
   // 2.4 for the bucket cups and labels below.
   const TOP_UNITS = 2.6; // spawn room + entry hole + floating title clearance
   const BOTTOM_UNITS = 2.2;
-  const maxGapW = (w * 0.92) / (bottomSpan + 1);
-  const maxGapH = h / (rows - 1 + TOP_UNITS + BOTTOM_UNITS);
-  const gap = Math.min(38, maxGapW, maxGapH);
+  // Below this gap a 3-char label can't fit horizontally in a chip at any
+  // legible font — switch to tall chips with 90°-rotated labels, which need
+  // extra reserved height below the last pin row.
+  const VERTICAL_LABEL_GAP = 16;
+  const BOTTOM_UNITS_TALL = 3.6;
+  const maxGapW = (w * 0.96) / (bottomSpan + 0.6);
+  let bottomUnits = BOTTOM_UNITS;
+  let gap = Math.min(38, maxGapW, h / (rows - 1 + TOP_UNITS + bottomUnits));
+  const verticalLabels = gap < VERTICAL_LABEL_GAP;
+  if (verticalLabels) {
+    bottomUnits = BOTTOM_UNITS_TALL;
+    gap = Math.min(38, maxGapW, h / (rows - 1 + TOP_UNITS + bottomUnits));
+  }
 
-  const contentH = gap * (rows - 1 + TOP_UNITS + BOTTOM_UNITS);
+  const contentH = gap * (rows - 1 + TOP_UNITS + bottomUnits);
   // When the board is width-limited there's leftover vertical space; bias it
   // 65/35 toward the top so the buckets sit near the controls (BGaming look)
   const startY = (h - contentH) * 0.65 + gap * TOP_UNITS;
@@ -73,7 +86,7 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
 
   return {
     gap, startY, endY, pins, bottomLeftX, bottomRightX, topLeftX, topRightX,
-    bucketLeftX, bucketRightX, bucketTopY,
+    bucketLeftX, bucketRightX, bucketTopY, verticalLabels,
     pinR: pinRadiusFor(gap), ballR: ballRadiusFor(gap),
   };
 }

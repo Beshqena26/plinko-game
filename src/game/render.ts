@@ -115,9 +115,10 @@ export function drawBuckets(
     const pressP = flashTime ? (now - flashTime) / 380 : 1;
     const pressY = pressP < 1 ? Math.sin(Math.min(pressP, 1) * Math.PI) * Math.min(7, gap * 0.3) : 0;
 
-    const chipW = bw - Math.max(1.5, gap * 0.1);
-    const chipH = Math.max(15, gap * 0.55);
-    const lip = Math.max(2, chipH * 0.18);
+    const vertical = geo.verticalLabels;
+    const chipW = bw - Math.max(1, gap * 0.06);
+    const chipH = vertical ? Math.min(gap * 2.7, Math.max(26, gap * 2.4)) : Math.max(17, gap * 0.8);
+    const lip = Math.max(2, Math.min(5, chipH * 0.18));
     const rad = Math.min(5, chipW * 0.18);
     const cx = x + (bw - chipW) / 2;
 
@@ -142,17 +143,29 @@ export function drawBuckets(
       ctx.fill();
     }
 
-    // label on the chip, dark navy like BGaming. On tight boards drop the
-    // "x" prefix and fit the font to the chip width so values stay legible.
+    // label on the chip, dark navy like BGaming. Tight boards drop the "x"
+    // prefix; when the chip is too narrow for horizontal text at a legible
+    // size, the chip is tall and the label rotates 90° (length limited by
+    // chip height instead of width).
     const value = mult >= 1000 ? `${(mult / 1000).toFixed(0)}K` : `${mult}`;
     const label = gap < 24 ? value : `x${value}`;
-    const fit = (chipW * 1.55) / Math.max(2, label.length);
-    const fontSize = Math.max(6, Math.min(11, gap * 0.34, fit));
-    ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#2A1502';
-    ctx.fillText(label, cx + chipW / 2, bucketTopY + chipH / 2 + 0.5);
+    if (vertical) {
+      const fontSize = Math.min(11, chipW - 2, ((chipH - 5) * 1.7) / Math.max(2, label.length));
+      ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+      ctx.save();
+      ctx.translate(cx + chipW / 2, bucketTopY + chipH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(label, 0, 0.5);
+      ctx.restore();
+    } else {
+      const fit = (chipW * 1.6) / Math.max(2, label.length);
+      const fontSize = Math.max(6.5, Math.min(13, gap * 0.5, fit));
+      ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+      ctx.fillText(label, cx + chipW / 2, bucketTopY + chipH / 2 + 0.5);
+    }
 
     ctx.restore();
   });

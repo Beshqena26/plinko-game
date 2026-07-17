@@ -94,6 +94,13 @@ export default function App() {
     return () => clearTimeout(tm);
   }, [lastRound?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // System alerts (insufficient balance etc.) auto-dismiss after 2.4s
+  useEffect(() => {
+    if (!game.alert) return;
+    const tm = setTimeout(() => game.setAlert(null), 2400);
+    return () => clearTimeout(tm);
+  }, [game.alert?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // BGaming behavior: in Auto mode PLAY runs "Number of bets" rounds
   // (∞ when set to 0); the STOP orb ends the run early.
   const onPlay = () => {
@@ -165,6 +172,12 @@ export default function App() {
 
         {winBanner && (
           <div className="win-banner" key={winBanner.id}>Win {fmt(winBanner.pay)}</div>
+        )}
+
+        {game.alert && (
+          <div className="alert-toast" key={game.alert.id}>
+            <span className="alert-icon">⚠</span> {game.alert.msg}
+          </div>
         )}
 
         <div className="row">

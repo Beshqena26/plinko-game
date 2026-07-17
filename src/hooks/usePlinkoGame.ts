@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import { getMultipliers } from '../utils/multipliers';
 import { getPath, randomHex, sha256 } from '../utils/provablyFair';
-import { MIN_BET, clampBetToBalance } from '../game/betting';
+import { MIN_BET } from '../game/betting';
 import { sound } from '../utils/sound';
 
 export interface BetResult {
@@ -12,6 +12,7 @@ export interface BetResult {
 
 export interface AutoSummary { rounds: number; wins: number; losses: number; profit: number }
 export interface QueuedBall { id: number; instant: boolean }
+export interface SystemAlert { id: number; msg: string }
 
 // Demo max-profit cap (Stake clips wins to a per-currency cap, never rejects).
 export const MAX_PROFIT = 10000;
@@ -51,6 +52,9 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
   const [serverSeed, setServerSeed] = useState(() => randomHex(32));
   const [clientSeed, setClientSeed] = useState(() => 'plinko_' + randomHex(6));
   const [paths] = useState(() => new Map<number, number[]>());
+  const [alert, setAlert] = useState<SystemAlert | null>(null);
+  const alertId = useRef(0);
+  const notify = useCallback((msg: string) => setAlert({ id: ++alertId.current, msg }), []);
 
   const idRef = useRef(0);
   const nonceRef = useRef(0);
@@ -82,15 +86,14 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
   }, [balance, ballsInFlight, autoRunning]);
 
   const drop = useCallback(async (isAuto = false) => {
-    // If the balance no longer covers the chosen bet, clamp the wager down to
-    // the highest affordable ladder step instead of dead-ending the button.
-    let bet = betRef.current;
+    // The bet is never changed behind the player's back — if the balance
+    // doesn't cover it, the round simply doesn't start and an alert says why.
+    const bet = betRef.current;
+    if (bet <= 0) return false;
     if (bet > balanceRef.current) {
-      bet = clampBetToBalance(bet, balanceRef.current);
-      setBetStrState(bet.toFixed(2));
-      localStorage.setItem('plinko_bet', bet.toFixed(2));
+      notify('Insufficient balance');
+      return false;
     }
-    if (balanceRef.current < bet || bet <= 0) return false;
     if (pending.current.size >= MAX_CONCURRENT_BALLS) return false;
     setBalance(p => p - bet);
     const id = ++idRef.current;
@@ -111,7 +114,7 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     localStorage.setItem('plinko_balance', String(ledgerRef.current));
     setBallQueue(p => [...p, { id, instant: instantRef.current }]);
     return true;
-  }, [rows, risk, paths]);
+  }, [rows, risk, paths, notify]);
 
   // Auto summary appears once the run has ended AND its last ball has landed.
   const maybeShowAutoSummary = useCallback(() => {
@@ -164,12 +167,16 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     const tick = async () => {
       if (!autoRef.current || c >= limit) { stopAuto(); return; }
       const ok = await drop(true);
-      if (!ok) { stopAuto(); return; }
+      if (!ok) {
+        if (c > 0) notify('Auto Play stopped — insufficient balance');
+        stopAuto();
+        return;
+      }
       c++; setAutoPlayed(c);
       setTimeout(tick, 1050); // BGaming's observed auto cadence (~1.1s/bet)
     };
     tick();
-  }, [drop, autoRounds, stopAuto]);
+  }, [drop, autoRounds, stopAuto, notify]);
 
   const rotateSeed = useCallback(() => {
     const next = randomHex(32);
@@ -185,5 +192,6 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     ballQueue, instant, setInstant, history, ballsInFlight,
     serverSeed, clientSeed, setClientSeed, rotateSeed,
     paths, drop, onLand, onConsumed, startAuto, stopAuto,
+    alert, setAlert, notify,
   };
 }

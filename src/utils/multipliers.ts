@@ -60,12 +60,13 @@ export function slotProbability(rows: number, k: number): number {
   return c / 2 ** rows;
 }
 
-// MYBC brand heat gradient across the bucket row: warm yellow center through
-// the brand orange to hot red edges.
+// Heat gradient across the bucket row: green at the low center slots,
+// through yellow and the brand orange, to hot red edges.
 const BUCKET_STOPS: [number, string][] = [
-  [0, '#FFD24D'],   // center
-  [0.45, '#F7931A'],
-  [0.75, '#FF6B44'],
+  [0, '#22C55E'],   // center
+  [0.35, '#FFD24D'],
+  [0.6, '#F7931A'],
+  [0.82, '#FF6B44'],
   [1, '#F8385D'],   // edge
 ];
 function hexLerp(a: string, b: string, t: number): string {
