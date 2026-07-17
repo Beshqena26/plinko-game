@@ -1,5 +1,9 @@
 const clamp01 = (v: number) => (isNaN(v) ? 0 : Math.max(0, Math.min(1, v)));
 
+// Game SFX are mixed quiet at the source — boost the master output so the
+// slider's range feels right (100% ≈ 1.4x raw gain; tiny sines never clip).
+const SFX_BOOST = 1.4;
+
 class SoundManager {
   private ctx: AudioContext | null = null;
   private enabled = localStorage.getItem('plinko_sfx') !== 'false';
@@ -94,7 +98,7 @@ class SoundManager {
     if (!this.ctx) {
       this.ctx = new AudioContext();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = this.sfxVol;
+      this.masterGain.gain.value = this.sfxVol * SFX_BOOST;
       this.masterGain.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -119,7 +123,7 @@ class SoundManager {
   setVolume(v: number) {
     this.sfxVol = clamp01(v);
     localStorage.setItem('plinko_sfx_vol', String(this.sfxVol));
-    if (this.masterGain) this.masterGain.gain.value = this.sfxVol;
+    if (this.masterGain) this.masterGain.gain.value = this.sfxVol * SFX_BOOST;
   }
 
   // Subtle tick — pitch rises with progress, very short
