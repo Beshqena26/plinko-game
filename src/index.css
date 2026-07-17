@@ -120,7 +120,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* ===== BGaming-style Lines rail (rows selector on the board edge) ===== */
 .lines-rail {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-  display: flex; flex-direction: column; gap: 2px; z-index: 20;
+  /* Above the board canvas but below the header (z 10) so header popovers
+     (dots menu, audio panel) always cover the rail */
+  display: flex; flex-direction: column; gap: 2px; z-index: 5;
 }
 .lines-rail-label {
   font-size: 10px; font-weight: 700; color: var(--text-mid);
@@ -284,6 +286,59 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .bgc-bet-display input:disabled { opacity: 0.5; }
 .bgc-balance { font-size: 12px; font-weight: 600; color: var(--text-mid); }
 .bgc-balance b { color: var(--text); font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+
+/* ===== AUDIO CONTROL PANEL (desktop header + mobile menu) ===== */
+.hdr-audio-wrap { position: relative; display: flex; }
+.hdr-dots-wrap { position: relative; display: flex; }
+.dots-menu-audio {
+  display: flex; flex-direction: column; gap: 12px;
+  margin-top: 4px; padding: 12px;
+  border-top: 1px solid var(--hairline);
+}
+.audio-pop {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 224px; padding: 14px;
+  display: flex; flex-direction: column; gap: 15px;
+  background: var(--panel); border: 1px solid var(--hairline);
+  border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  z-index: 60; cursor: default;
+}
+.audio-row { display: flex; flex-direction: column; gap: 10px; }
+.audio-row-head { display: flex; align-items: center; justify-content: space-between; }
+.audio-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; color: var(--text-75);
+}
+.audio-label svg { width: 15px; height: 15px; }
+.audio-switch {
+  position: relative; width: 36px; height: 20px; padding: 0; flex-shrink: 0;
+  border: 1px solid var(--toggle-border); border-radius: 999px;
+  background: #272859; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.audio-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #FFFFFF; transition: transform 0.15s;
+}
+.audio-switch.on { background: var(--accent); border-color: var(--accent); }
+.audio-switch.on::after { transform: translateX(16px); }
+.audio-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px; border-radius: 2px;
+  background: #272859; outline: none; cursor: pointer;
+}
+.audio-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+  cursor: pointer; transition: transform 0.12s;
+}
+.audio-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.audio-slider::-moz-range-thumb {
+  width: 14px; height: 14px; border: none; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+.audio-slider:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ===== SYSTEM ALERT TOAST ===== */
 /* Styled like the game's purple control cards: dark panel, hairline border,

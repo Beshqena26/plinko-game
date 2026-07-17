@@ -30,6 +30,12 @@ const ClockSVG = () => (
 const ShieldSVG = () => (
   <svg viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="2"/></svg>
 );
+const MusicSVG = ({ on }: { on: boolean }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+    {!on && <line x1="3" y1="3" x2="21" y2="21" />}
+  </svg>
+);
 const SoundSVG = ({ on }: { on: boolean }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />{on && <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />}</svg>
 );
@@ -72,7 +78,11 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState(16);
   const [risk, setRisk] = useState<RiskLevel>('high');
-  const [soundOn, setSoundOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(() => sound.isEnabled());
+  const [musicOn, setMusicOn] = useState(() => sound.isMusicEnabled());
+  const [audioOpen, setAudioOpen] = useState(false);
+  const [musicVol, setMusicVol] = useState(() => Math.round(sound.getMusicVolume() * 100));
+  const [sfxVol, setSfxVol] = useState(() => Math.round(sound.getVolume() * 100));
   const [infoOpen, setInfoOpen] = useState(false);
   const [pfOpen, setPfOpen] = useState(false);
   const [histOpen, setHistOpen] = useState(false);
@@ -110,19 +120,49 @@ export default function App() {
 
   useEffect(() => {
     const tm = setTimeout(() => setLoading(false), 2200);
+    sound.armMusicAutostart();
     return () => clearTimeout(tm);
   }, []);
 
-  // close the header dots menu on any outside click
+  // close the header dots menu / audio panel on any outside click
   useEffect(() => {
-    if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
+    if (!menuOpen && !audioOpen) return;
+    const close = () => { setMenuOpen(false); setAudioOpen(false); };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
-  }, [menuOpen]);
+  }, [menuOpen, audioOpen]);
 
   const mults = getMultipliers(risk, rows);
   const handleSoundToggle = () => setSoundOn(sound.toggle());
+  const handleMusicToggle = () => setMusicOn(sound.toggleMusic());
+
+  // Shared audio rows (desktop popover + mobile dots menu)
+  const audioRows = (
+    <>
+      <div className="audio-row">
+        <div className="audio-row-head">
+          <span className="audio-label"><MusicSVG on={musicOn} /> Music</span>
+          <button className={`audio-switch${musicOn ? ' on' : ''}`} onClick={handleMusicToggle} aria-label="Toggle music" />
+        </div>
+        <input
+          className="audio-slider" type="range" min={0} max={100} value={musicVol} disabled={!musicOn}
+          style={{ background: `linear-gradient(to right, var(--accent) ${musicVol}%, #272859 ${musicVol}%)` }}
+          onChange={(e) => { const v = +e.target.value; setMusicVol(v); sound.setMusicVolume(v / 100); }}
+        />
+      </div>
+      <div className="audio-row">
+        <div className="audio-row-head">
+          <span className="audio-label"><SoundSVG on={soundOn} /> Sound</span>
+          <button className={`audio-switch${soundOn ? ' on' : ''}`} onClick={handleSoundToggle} aria-label="Toggle sound effects" />
+        </div>
+        <input
+          className="audio-slider" type="range" min={0} max={100} value={sfxVol} disabled={!soundOn}
+          style={{ background: `linear-gradient(to right, var(--accent) ${sfxVol}%, #272859 ${sfxVol}%)` }}
+          onChange={(e) => { const v = +e.target.value; setSfxVol(v); sound.setVolume(v / 100); }}
+        />
+      </div>
+    </>
+  );
 
   if (loading) return (
     <div className="loading-screen">
@@ -153,20 +193,33 @@ export default function App() {
             <button className="hdr-btn hdr-desktop" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
             <button className="hdr-btn hdr-desktop" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
             <button className={`hdr-btn hdr-desktop${game.instant ? ' hdr-on' : ''}`} onClick={() => game.setInstant(v => !v)} title="Instant Bet"><BoltHdrSVG /></button>
-            <button className="hdr-btn hdr-desktop" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
+            <div className="hdr-audio-wrap hdr-desktop">
+              <button
+                className={`hdr-btn${audioOpen ? ' hdr-on' : ''}`}
+                onClick={(e) => { e.stopPropagation(); setAudioOpen(v => !v); }}
+                title="Audio"
+              ><SoundSVG on={soundOn || musicOn} /></button>
+              {audioOpen && (
+                <div className="audio-pop" onClick={(e) => e.stopPropagation()}>
+                  {audioRows}
+                </div>
+              )}
+            </div>
             <button className="hdr-btn hdr-desktop hdr-info" onClick={() => setInfoOpen(true)} title="How to Play">i</button>
             <button className="hdr-btn hdr-mobile" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
-            <button className="hdr-btn hdr-mobile hdr-dots" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} title="Menu">
-              <svg viewBox="0 0 20 12" fill="none" width="16" height="10"><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="6" r="1.5" fill="currentColor"/></svg>
+            <div className="hdr-dots-wrap hdr-mobile">
+              <button className="hdr-btn hdr-dots" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} title="Menu">
+                <svg viewBox="0 0 20 12" fill="none" width="16" height="10"><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="6" r="1.5" fill="currentColor"/></svg>
+              </button>
               {menuOpen && (
                 <div className="dots-menu open" onClick={(e) => e.stopPropagation()}>
                   <div className="dots-menu-item" onClick={() => { setPfOpen(true); setMenuOpen(false); }}><ShieldSVG /> Fair Play</div>
                   <div className="dots-menu-item" onClick={() => { game.setInstant(v => !v); setMenuOpen(false); }}><BoltHdrSVG /> {game.instant ? 'Instant Bet On' : 'Instant Bet Off'}</div>
                   <div className="dots-menu-item" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}><InfoSVG /> How to Play</div>
-                  <div className="dots-menu-item" onClick={() => { handleSoundToggle(); setMenuOpen(false); }}><SoundSVG on={soundOn} /> {soundOn ? 'Sound On' : 'Sound Off'}</div>
+                  <div className="dots-menu-audio">{audioRows}</div>
                 </div>
               )}
-            </button>
+            </div>
           </div>
         </div>
 
@@ -206,14 +259,18 @@ export default function App() {
               {/* Lines rail: rows selector on the board edge */}
               <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
                 <span className="lines-rail-label">Lines</span>
-                {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => (
-                  <button
-                    key={n}
-                    className={`lines-rail-btn${rows === n ? ' active' : ''}`}
-                    onClick={() => setRows(n)}
-                    disabled={game.ballsInFlight > 0 || game.autoRunning}
-                  >{n}</button>
-                ))}
+                {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => {
+                  const disabled = game.ballsInFlight > 0 || game.autoRunning;
+                  return (
+                    <button
+                      key={n}
+                      className={`lines-rail-btn${rows === n ? ' active' : ''}`}
+                      onMouseEnter={() => { if (!disabled) sound.uiHover(); }}
+                      onClick={() => { if (rows !== n) sound.uiClick(); setRows(n); }}
+                      disabled={disabled}
+                    >{n}</button>
+                  );
+                })}
               </div>
             </div>
 

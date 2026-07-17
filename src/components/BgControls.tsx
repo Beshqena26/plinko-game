@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import { fmt } from '../utils/format';
+import { sound } from '../utils/sound';
 
-import { MIN_BET, MAX_BET, BET_STEPS, clampBetToBalance } from '../game/betting';
+import { MIN_BET, MAX_BET, BET_STEPS } from '../game/betting';
 export { MIN_BET, MAX_BET };
 
 // Number-of-bets ladder for auto mode ('0' renders as ∞).
@@ -62,9 +63,10 @@ export default function BgControls({
   const betLocked = autoRunning; // bet edits are safe mid-flight (per-ball snapshot)
   const bet = Math.max(0, parseFloat(betStr) || 0);
   const remaining = totalAutoRounds === '∞' ? '∞' : String(Math.max(0, parseInt(totalAutoRounds) - autoPlayed));
-  // Highest ladder step the balance can cover — Max and + never exceed it,
-  // so the shown bet is always actually playable.
-  const affordableMax = Math.min(MAX_BET, clampBetToBalance(MAX_BET, balance));
+  // Max bets the full balance (floored to cents, capped at the table max) —
+  // with $13.44 in the wallet, Max bets exactly $13.44. The + stepper still
+  // walks the ladder but never past this.
+  const affordableMax = Math.max(MIN_BET, Math.min(MAX_BET, Math.round(balance * 100) / 100));
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -82,15 +84,19 @@ export default function BgControls({
     const next = dir === 1
       ? BET_STEPS.find(s => s > bet + 1e-9 && s <= affordableMax)
       : [...BET_STEPS].reverse().find(s => s < bet - 1e-9);
-    if (next != null) setBetStr(next.toFixed(2));
+    if (next != null) { sound.uiClick(); setBetStr(next.toFixed(2)); }
   };
 
   const stepAuto = (dir: 1 | -1) => {
     const i = AUTO_STEPS.indexOf(autoRounds);
     const cur = i === -1 ? 1 : i;
     const next = Math.max(0, Math.min(AUTO_STEPS.length - 1, cur + dir));
+    if (AUTO_STEPS[next] !== autoRounds) sound.uiClick();
     setAutoRounds(AUTO_STEPS[next]);
   };
+
+  // Hover blip for any enabled control (no-op on touch devices)
+  const hover = (enabled: boolean) => () => { if (enabled) sound.uiHover(); };
 
   return (
     <div className="bgc">
@@ -102,7 +108,8 @@ export default function BgControls({
               <button
                 key={r.v}
                 className={`bgc-opt${risk === r.v ? ' active-mode' : ''}`}
-                onClick={() => setRisk(r.v)}
+                onMouseEnter={hover(!locked)}
+                onClick={() => { if (risk !== r.v) sound.uiClick(); setRisk(r.v); }}
                 disabled={locked}
               >
                 <span className="bgc-ico">{r.ico}</span>
@@ -135,7 +142,8 @@ export default function BgControls({
           <div className="bgc-card bgc-mode">
             <button
               className={`bgc-opt${mode === 'manual' ? ' active-mode' : ''}`}
-              onClick={() => setMode('manual')}
+              onMouseEnter={hover(!locked)}
+              onClick={() => { if (mode !== 'manual') sound.uiClick(); setMode('manual'); }}
               disabled={locked}
             >
               <span className="bgc-ico"><b style={{ color: '#A78BFA' }}>M</b></span>
@@ -143,7 +151,8 @@ export default function BgControls({
             </button>
             <button
               className={`bgc-opt${mode === 'auto' ? ' active-mode' : ''}`}
-              onClick={() => setMode('auto')}
+              onMouseEnter={hover(!locked)}
+              onClick={() => { if (mode !== 'auto') sound.uiClick(); setMode('auto'); }}
               disabled={locked}
             >
               <span className="bgc-ico"><b style={{ color: '#F43F5E' }}>A</b></span>
@@ -153,9 +162,9 @@ export default function BgControls({
               <div className="bgc-nob">
                 <span className="bgc-nob-label">Number of bets</span>
                 <div className="bgc-nob-row">
-                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onClick={() => stepAuto(-1)}>−</button>
+                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[0])} onClick={() => stepAuto(-1)}>−</button>
                   <span className="bgc-nob-val">{autoRounds === '0' ? '∞' : autoRounds}</span>
-                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[AUTO_STEPS.length - 1]} onClick={() => stepAuto(1)}>+</button>
+                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[AUTO_STEPS.length - 1]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[AUTO_STEPS.length - 1])} onClick={() => stepAuto(1)}>+</button>
                 </div>
               </div>
             )}
@@ -165,16 +174,16 @@ export default function BgControls({
 
       <div className="bgc-bet-row">
         <div className="bgc-bet-side">
-          <button className="bgc-pill" disabled={betLocked || bet <= MIN_BET} onClick={() => setBetStr(MIN_BET.toFixed(2))}>Min</button>
-          <button className="bgc-pill" disabled={betLocked || bet <= MIN_BET} onClick={() => stepBet(-1)}>−</button>
+          <button className="bgc-pill" disabled={betLocked || bet <= MIN_BET} onMouseEnter={hover(!betLocked && bet > MIN_BET)} onClick={() => { sound.uiClick(); setBetStr(MIN_BET.toFixed(2)); }}>Min</button>
+          <button className="bgc-pill" disabled={betLocked || bet <= MIN_BET} onMouseEnter={hover(!betLocked && bet > MIN_BET)} onClick={() => stepBet(-1)}>−</button>
         </div>
         <div className="bgc-bet-display">
           <span>Bet</span>
           <b>{fmt(bet)}</b>
         </div>
         <div className="bgc-bet-side">
-          <button className="bgc-pill" disabled={betLocked || bet >= affordableMax} onClick={() => stepBet(1)}>+</button>
-          <button className="bgc-pill" disabled={betLocked || Math.abs(bet - affordableMax) < 1e-9} onClick={() => setBetStr(affordableMax.toFixed(2))}>Max</button>
+          <button className="bgc-pill" disabled={betLocked || bet >= affordableMax} onMouseEnter={hover(!betLocked && bet < affordableMax)} onClick={() => stepBet(1)}>+</button>
+          <button className="bgc-pill" disabled={betLocked || Math.abs(bet - affordableMax) < 1e-9} onMouseEnter={hover(!betLocked && Math.abs(bet - affordableMax) >= 1e-9)} onClick={() => { sound.uiClick(); setBetStr(affordableMax.toFixed(2)); }}>Max</button>
         </div>
       </div>
 
