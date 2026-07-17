@@ -178,6 +178,12 @@ export default function App() {
   return (
     <>
       <div className={`app bg-scene${game.autoRunning ? ' auto-running' : ''}`}>
+        {/* Ambient background: rising bokeh orbs + breathing glow + sparks */}
+        <div className="bg-fx" aria-hidden="true">
+          <div className="bg-glow" />
+          {Array.from({ length: 8 }, (_, i) => <span key={`o${i}`} className={`bg-orb bg-orb-${i + 1}`} />)}
+          {Array.from({ length: 10 }, (_, i) => <span key={`s${i}`} className={`bg-spark bg-spark-${i + 1}`} />)}
+        </div>
         <div className="header">
           <div className="header-left">
             <div className="game-name">
