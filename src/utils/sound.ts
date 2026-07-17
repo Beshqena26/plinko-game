@@ -6,6 +6,30 @@ const SFX_BOOST = 1.4;
 
 class SoundManager {
   private ctx: AudioContext | null = null;
+  private pausedByHide = false;
+
+  constructor() {
+    // Mobile browsers let media elements keep playing in the background
+    // (music-app behavior) — a game should go silent when the app is folded
+    // away and come back when it returns.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // may fire repeatedly while hidden — only record the first transition
+        if (!this.pausedByHide) this.pausedByHide = !!this.music && !this.music.paused;
+        this.music?.pause();
+        void this.ctx?.suspend().catch(() => {});
+      } else {
+        void this.ctx?.resume().catch(() => {});
+        if (this.pausedByHide && this.musicEnabled) this.getMusic().play().catch(() => {});
+        this.pausedByHide = false;
+      }
+    });
+    // iOS Safari can skip visibilitychange when the page is torn down
+    window.addEventListener('pagehide', () => {
+      this.music?.pause();
+      void this.ctx?.suspend().catch(() => {});
+    });
+  }
   private enabled = localStorage.getItem('plinko_sfx') !== 'false';
   private masterGain: GainNode | null = null;
   private music: HTMLAudioElement | null = null;
