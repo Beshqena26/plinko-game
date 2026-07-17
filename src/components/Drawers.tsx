@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { BetResult } from '../App';
 import { fmt } from '../App';
 import type { RiskLevel } from '../utils/multipliers';
@@ -32,7 +32,18 @@ interface DrawerShellProps {
   footer?: React.ReactNode;
 }
 
+// Close an open drawer on Escape (shared by all drawers)
+function useEscapeClose(open: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!open) return;
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [open, onClose]);
+}
+
 function DrawerShell({ open, onClose, title, children, footer }: DrawerShellProps) {
+  useEscapeClose(open, onClose);
   return (
     <div className={`drawer-backdrop${open ? ' show' : ''}`} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="drawer" onClick={e => e.stopPropagation()}>
@@ -112,6 +123,7 @@ export function PfDrawer({ open, onClose, serverSeed, clientSeed, setClientSeed,
   const [verifyServer, setVerifyServer] = useState('');
   const [verifyHash, setVerifyHash] = useState('');
   const [verifyResult, setVerifyResult] = useState<{ ok: boolean | null; hash: string } | null>(null);
+  useEscapeClose(open, onClose);
 
   if (open && !seedHash) { void sha256(serverSeed).then(setSeedHash); }
 

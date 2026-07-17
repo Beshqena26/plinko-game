@@ -32,20 +32,22 @@ class SoundManager {
     return this.sfxVol;
   }
 
-  // Browsers block audio until a user gesture — arm a one-shot listener that
-  // starts the music on the first interaction if it's enabled.
+  // Start the music immediately if the browser allows it (returning visitors
+  // usually can); when autoplay is blocked, fall back to the first gesture.
   armMusicAutostart() {
     if (!this.musicEnabled) return;
-    const start = () => {
-      cleanup();
-      if (this.musicEnabled) this.getMusic().play().catch(() => {});
-    };
-    const cleanup = () => {
-      window.removeEventListener('pointerdown', start);
-      window.removeEventListener('keydown', start);
-    };
-    window.addEventListener('pointerdown', start);
-    window.addEventListener('keydown', start);
+    this.getMusic().play().catch(() => {
+      const start = () => {
+        cleanup();
+        if (this.musicEnabled) this.getMusic().play().catch(() => {});
+      };
+      const cleanup = () => {
+        window.removeEventListener('pointerdown', start);
+        window.removeEventListener('keydown', start);
+      };
+      window.addEventListener('pointerdown', start);
+      window.addEventListener('keydown', start);
+    });
   }
 
   toggleMusic(): boolean {
