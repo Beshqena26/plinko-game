@@ -5,6 +5,7 @@ class SoundManager {
   private enabled = localStorage.getItem('plinko_sfx') !== 'false';
   private masterGain: GainNode | null = null;
   private music: HTMLAudioElement | null = null;
+  private musicGain: GainNode | null = null;
   private musicEnabled = localStorage.getItem('plinko_music') !== 'false';
   private musicVol = clamp01(parseFloat(localStorage.getItem('plinko_music_vol') ?? '0.3'));
   private sfxVol = clamp01(parseFloat(localStorage.getItem('plinko_sfx_vol') ?? '0.5'));
@@ -18,10 +19,29 @@ class SoundManager {
     return this.music;
   }
 
+  // iOS ignores HTMLMediaElement.volume (hardware buttons only) — route the
+  // music through a WebAudio gain node so the volume slider works everywhere.
+  private wireMusicThroughCtx() {
+    if (this.musicGain) return;
+    try {
+      const ctx = this.getCtx();
+      const el = this.getMusic();
+      const src = ctx.createMediaElementSource(el);
+      this.musicGain = ctx.createGain();
+      this.musicGain.gain.value = this.musicVol;
+      src.connect(this.musicGain);
+      this.musicGain.connect(ctx.destination);
+      el.volume = 1; // gain node owns the level now — avoid double attenuation
+    } catch {
+      /* unsupported — element.volume fallback stays in effect */
+    }
+  }
+
   setMusicVolume(v: number) {
     this.musicVol = clamp01(v);
     localStorage.setItem('plinko_music_vol', String(this.musicVol));
-    if (this.music) this.music.volume = this.musicVol;
+    if (this.musicGain) this.musicGain.gain.value = this.musicVol;
+    else if (this.music) this.music.volume = this.musicVol;
   }
 
   getMusicVolume(): number {
@@ -34,27 +54,35 @@ class SoundManager {
 
   // Start the music immediately if the browser allows it (returning visitors
   // usually can); when autoplay is blocked, fall back to the first gesture.
+  // The gesture listener also re-kicks the AudioContext in case it started
+  // suspended (music routes through it for iOS-proof volume control).
   armMusicAutostart() {
     if (!this.musicEnabled) return;
-    this.getMusic().play().catch(() => {
-      const start = () => {
-        cleanup();
-        if (this.musicEnabled) this.getMusic().play().catch(() => {});
-      };
-      const cleanup = () => {
-        window.removeEventListener('pointerdown', start);
-        window.removeEventListener('keydown', start);
-      };
-      window.addEventListener('pointerdown', start);
-      window.addEventListener('keydown', start);
-    });
+    const kick = () => {
+      this.wireMusicThroughCtx();
+      this.getCtx(); // resumes a suspended context when allowed
+      if (this.musicEnabled) this.getMusic().play().catch(() => {});
+    };
+    kick();
+    const onGesture = () => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+      kick();
+    };
+    window.addEventListener('pointerdown', onGesture);
+    window.addEventListener('keydown', onGesture);
   }
 
   toggleMusic(): boolean {
     this.musicEnabled = !this.musicEnabled;
     localStorage.setItem('plinko_music', String(this.musicEnabled));
-    if (this.musicEnabled) this.getMusic().play().catch(() => {});
-    else this.music?.pause();
+    if (this.musicEnabled) {
+      this.wireMusicThroughCtx();
+      this.getCtx();
+      this.getMusic().play().catch(() => {});
+    } else {
+      this.music?.pause();
+    }
     return this.musicEnabled;
   }
 

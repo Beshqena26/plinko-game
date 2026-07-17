@@ -146,7 +146,7 @@ export default function App() {
         </div>
         <input
           className="audio-slider" type="range" min={0} max={100} value={musicVol} disabled={!musicOn}
-          style={{ background: `linear-gradient(to right, var(--accent) ${musicVol}%, #272859 ${musicVol}%)` }}
+          style={{ backgroundImage: `linear-gradient(to right, var(--accent) ${musicVol}%, #272859 ${musicVol}%)` }}
           onChange={(e) => { const v = +e.target.value; setMusicVol(v); sound.setMusicVolume(v / 100); }}
         />
       </div>
@@ -157,7 +157,7 @@ export default function App() {
         </div>
         <input
           className="audio-slider" type="range" min={0} max={100} value={sfxVol} disabled={!soundOn}
-          style={{ background: `linear-gradient(to right, var(--accent) ${sfxVol}%, #272859 ${sfxVol}%)` }}
+          style={{ backgroundImage: `linear-gradient(to right, var(--accent) ${sfxVol}%, #272859 ${sfxVol}%)` }}
           onChange={(e) => { const v = +e.target.value; setSfxVol(v); sound.setVolume(v / 100); }}
         />
       </div>

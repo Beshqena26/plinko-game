@@ -324,12 +324,17 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .audio-switch.on::after { transform: translateX(16px); }
 .audio-slider {
   -webkit-appearance: none; appearance: none;
-  width: 100%; height: 4px; border-radius: 2px;
-  background: #272859; outline: none; cursor: pointer;
+  /* 20px hit area for touch; the visible 4px track is painted by the inline
+     backgroundImage gradient, centered by background-size/position */
+  width: 100%; height: 20px; border-radius: 2px;
+  background-color: transparent;
+  background-size: 100% 4px; background-position: center; background-repeat: no-repeat;
+  outline: none; cursor: pointer; touch-action: none;
 }
+.audio-slider::-webkit-slider-runnable-track { height: 20px; background: transparent; }
 .audio-slider::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: 14px; height: 14px; border-radius: 50%;
+  width: 14px; height: 14px; margin-top: 3px; border-radius: 50%;
   background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
   cursor: pointer; transition: transform 0.12s;
 }
