@@ -29,19 +29,19 @@ interface Props {
 }
 
 const FlameSVG = () => (
-  <svg viewBox="0 0 24 24" width="13" height="13" fill="#F85F5D"><path d="M12 2s1 3.2-1.5 6C8.2 10.5 7 12.3 7 14.5A5 5 0 0 0 12 19.5a5 5 0 0 0 5-5c0-1.6-.6-2.9-1.4-4.1-.4 1-1.1 1.8-2.1 2.1.4-2.5-.3-6.2-1.5-8.5z"/></svg>
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="#F43F5E"><path d="M20.6005 11.7C20.2005 10.4 19.4005 9.2 18.5005 8.2C18.4005 8.1 18.4005 8.1 18.3005 8C17.8005 7.7 17.2005 7.9 16.9005 8.4C16.9005 8.4 16.9005 8.4 16.9005 8.5C16.6005 9.2 16.1005 9.8 15.5005 10.3C15.6005 9.8 15.6005 9.3 15.6005 8.8C15.6005 5.7 13.9005 2.8 11.2005 1.2C10.6005 0.9 10.0005 1 9.80047 1.5C9.70047 1.6 9.60047 1.8 9.60047 1.9C9.50047 3.8 8.60047 5.6 7.10047 6.8L6.90047 7.1C6.10047 7.6 5.50047 8.2 4.90047 9C1.80047 12.9 2.50047 18.5 6.40047 21.6C7.10047 22.1 7.80047 22.6 8.60047 22.9C9.10047 23.1 9.70047 22.9 9.90047 22.4C9.90047 22.3 10.0005 22.2 10.0005 22C10.0005 21.9 10.0005 21.8 10.0005 21.7C9.80047 20.9 9.70047 20 9.80047 19.1C10.7005 20.9 12.3005 22.3 14.1005 23.1C14.3005 23.2 14.6005 23.2 14.8005 23.1C19.5005 21.5 22.1005 16.5 20.6005 11.7Z"/></svg>
 );
-const GaugeSVG = () => (
-  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#F7931A" strokeWidth="2.4" strokeLinecap="round"><path d="M5 17a8 8 0 1 1 14 0"/><path d="M12 13l3.5-3.5"/></svg>
+const DiceSVG = () => (
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="#FFD106"><path d="M12 2C6.5 2 2 6.5 2 12C2 17.5 6.5 22 12 22C17.5 22 22 17.5 22 12C22 6.5 17.5 2 12 2ZM9 10C8.4 10 8 9.6 8 9C8 8.4 8.4 8 9 8C9.6 8 10 8.4 10 9C10 9.6 9.6 10 9 10ZM12 17C10.7 16.9 9.7 15.8 9.8 14.5C9.7 13.2 10.7 12.1 12 12C13.3 12.1 14.3 13.2 14.2 14.5C14.3 15.8 13.3 16.9 12 17ZM15 10C14.4 10 14 9.6 14 9C14 8.4 14.4 8 15 8C15.6 8 16 8.4 16 9C16 9.6 15.6 10 15 10Z"/></svg>
 );
-const IceSVG = () => (
-  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#E91E8C" strokeWidth="2.2" strokeLinecap="round"><path d="M12 3v18M5.5 6.5l13 11M18.5 6.5l-13 11"/></svg>
+const ThumbSVG = () => (
+  <svg viewBox="0 0 24 24" width="13" height="13" fill="#22C55E"><path d="M21.3 10.1C20.7 9.4 19.9 9 19 9H14.4L15 7.6C15.8 5.5 14.7 3.1 12.6 2.3C12.1 2.1 11.6 2 11.1 2C10.7 2 10.3 2.2 10.2 2.6L7.3 9H5C3.3 9 2 10.3 2 12V19C2 20.7 3.3 22 5 22H17.7C19.2 22 20.4 21 20.7 19.5L22 12.5C22.1 11.7 21.9 10.8 21.3 10.1ZM7 20H5C4.4 20 4 19.6 4 19V12C4 11.4 4.4 11 5 11H7V20Z"/></svg>
 );
 
 const RISKS: { v: RiskLevel; l: string; ico: React.ReactNode }[] = [
   { v: 'high', l: 'High', ico: <FlameSVG /> },
-  { v: 'medium', l: 'Normal', ico: <GaugeSVG /> },
-  { v: 'low', l: 'Low', ico: <IceSVG /> },
+  { v: 'medium', l: 'Normal', ico: <DiceSVG /> },
+  { v: 'low', l: 'Low', ico: <ThumbSVG /> },
 ];
 
 // BGaming Plinko control cluster (1:1 with the demo close-up):
@@ -135,7 +135,7 @@ export default function BgControls({
               onClick={() => setMode('manual')}
               disabled={locked}
             >
-              <span className="bgc-ico"><b style={{ color: '#7C5CD6' }}>M</b></span>
+              <span className="bgc-ico bgc-ico--chip"><b style={{ color: '#7C5CD6' }}>M</b></span>
               Manual
             </button>
             <button
@@ -143,7 +143,7 @@ export default function BgControls({
               onClick={() => setMode('auto')}
               disabled={locked}
             >
-              <span className="bgc-ico"><b style={{ color: '#E9375B' }}>A</b></span>
+              <span className="bgc-ico bgc-ico--chip"><b style={{ color: '#E9375B' }}>A</b></span>
               Auto
             </button>
             {mode === 'auto' && (

@@ -41,7 +41,9 @@ export function getGeometry(w: number, h: number, rows: number): BoardGeometry {
   const gap = Math.min(38, maxGapW, maxGapH);
 
   const contentH = gap * (rows - 1 + TOP_UNITS + BOTTOM_UNITS);
-  const startY = (h - contentH) / 2 + gap * TOP_UNITS;
+  // When the board is width-limited there's leftover vertical space; bias it
+  // 65/35 toward the top so the buckets sit near the controls (BGaming look)
+  const startY = (h - contentH) * 0.65 + gap * TOP_UNITS;
 
   const pins: Pin[] = [];
   for (let r = 0; r < rows; r++) {

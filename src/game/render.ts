@@ -115,8 +115,8 @@ export function drawBuckets(
     const pressP = flashTime ? (now - flashTime) / 380 : 1;
     const pressY = pressP < 1 ? Math.sin(Math.min(pressP, 1) * Math.PI) * Math.min(7, gap * 0.3) : 0;
 
-    const chipW = bw - Math.max(2, gap * 0.1);
-    const chipH = Math.max(13, gap * 0.55);
+    const chipW = bw - Math.max(1.5, gap * 0.1);
+    const chipH = Math.max(15, gap * 0.55);
     const lip = Math.max(2, chipH * 0.18);
     const rad = Math.min(5, chipW * 0.18);
     const cx = x + (bw - chipW) / 2;
@@ -142,12 +142,15 @@ export function drawBuckets(
       ctx.fill();
     }
 
-    // label on the chip, dark navy like BGaming
-    const fontSize = Math.max(6.5, Math.min(11, gap * 0.3));
+    // label on the chip, dark navy like BGaming. On tight boards drop the
+    // "x" prefix and fit the font to the chip width so values stay legible.
+    const value = mult >= 1000 ? `${(mult / 1000).toFixed(0)}K` : `${mult}`;
+    const label = gap < 24 ? value : `x${value}`;
+    const fit = (chipW * 1.55) / Math.max(2, label.length);
+    const fontSize = Math.max(6, Math.min(11, gap * 0.34, fit));
     ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const label = mult >= 1000 ? `x${(mult / 1000).toFixed(0)}K` : `x${mult}`;
     ctx.fillStyle = '#2A1502';
     ctx.fillText(label, cx + chipW / 2, bucketTopY + chipH / 2 + 0.5);
 

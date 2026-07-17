@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useUiScale } from './hooks/useUiScale';
 import PlinkoBoard from './components/PlinkoBoard';
 import BgControls from './components/BgControls';
 import type { BetMode } from './components/BgControls';
@@ -39,6 +40,34 @@ const BoltHdrSVG = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></svg>
 );
 
+// Scales its child as one rigid unit (BGaming stage behavior): the child is
+// laid out at full design size, then transform-scaled; the wrapper's height
+// shrinks to match so the board above gets the reclaimed space.
+function ScaleBox({ scale, children }: { scale: number; children: React.ReactNode }) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [naturalH, setNaturalH] = useState(0);
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const measure = () => setNaturalH(el.offsetHeight);
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    // re-measure on the frame after a scale change settles — mid-resize the
+    // observer can capture a transient layout height and never fire again
+    const raf = requestAnimationFrame(measure);
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, [scale]);
+  if (scale >= 1) return <>{children}</>;
+  return (
+    <div style={{ height: naturalH ? naturalH * scale : undefined, flexShrink: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'visible' }}>
+      <div ref={innerRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top center', width: `${100 / scale}%`, flexShrink: 0 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState(16);
@@ -49,8 +78,12 @@ export default function App() {
   const [histOpen, setHistOpen] = useState(false);
   const [mode, setMode] = useState<BetMode>('manual');
   const [winBanner, setWinBanner] = useState<{ id: number; pay: number } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
 
   const game = usePlinkoGame(rows, risk);
+  // Below 360×640 the control cluster scales uniformly instead of reflowing
+  const uiScale = useUiScale(360, 640);
 
   // BGaming shows a "Win X" banner top-center on every winning landing.
   const lastRound = game.history[0];
@@ -73,6 +106,14 @@ export default function App() {
     return () => clearTimeout(tm);
   }, []);
 
+  // close the header dots menu on any outside click
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [menuOpen]);
+
   const mults = getMultipliers(risk, rows);
   const handleSoundToggle = () => setSoundOn(sound.toggle());
 
@@ -90,18 +131,35 @@ export default function App() {
   return (
     <>
       <div className={`app bg-scene${game.autoRunning ? ' auto-running' : ''}`}>
-        {/* Floating top layer — BGaming has no header bar */}
-        <div className="fx-top">
-          <div className="fx-title">
-            <PlinkoIcon size={22} />
-            <span>PLINKO</span>
+        <div className="header">
+          <div className="header-left">
+            <div className="game-name">
+              <PlinkoIcon size={20} />
+              <span>Plinko</span>
+            </div>
           </div>
-          <div className="fx-actions">
-            <button className="fx-btn" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
-            <button className="fx-btn" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
-            <button className={`fx-btn${game.instant ? ' fx-on' : ''}`} onClick={() => game.setInstant(v => !v)} title="Instant Bet"><BoltHdrSVG /></button>
-            <button className="fx-btn" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
-            <button className="fx-btn" onClick={() => setInfoOpen(true)} title="How to Play"><InfoSVG /></button>
+          <div className="header-bal">
+            <span className="header-bal-icon">$</span>
+            <span className="header-bal-value">{game.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          <div className="header-right">
+            <button className="hdr-btn hdr-desktop" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
+            <button className="hdr-btn hdr-desktop" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
+            <button className={`hdr-btn hdr-desktop${game.instant ? ' hdr-on' : ''}`} onClick={() => game.setInstant(v => !v)} title="Instant Bet"><BoltHdrSVG /></button>
+            <button className="hdr-btn hdr-desktop" onClick={handleSoundToggle} title="Sound"><SoundSVG on={soundOn} /></button>
+            <button className="hdr-btn hdr-desktop hdr-info" onClick={() => setInfoOpen(true)} title="How to Play">i</button>
+            <button className="hdr-btn hdr-mobile" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
+            <button className="hdr-btn hdr-mobile hdr-dots" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} title="Menu">
+              <svg viewBox="0 0 20 12" fill="none" width="16" height="10"><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="10" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="6" r="1.5" fill="currentColor"/></svg>
+              {menuOpen && (
+                <div className="dots-menu open" onClick={(e) => e.stopPropagation()}>
+                  <div className="dots-menu-item" onClick={() => { setPfOpen(true); setMenuOpen(false); }}><ShieldSVG /> Fair Play</div>
+                  <div className="dots-menu-item" onClick={() => { game.setInstant(v => !v); setMenuOpen(false); }}><BoltHdrSVG /> {game.instant ? 'Instant Bet On' : 'Instant Bet Off'}</div>
+                  <div className="dots-menu-item" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}><InfoSVG /> How to Play</div>
+                  <div className="dots-menu-item" onClick={() => { handleSoundToggle(); setMenuOpen(false); }}><SoundSVG on={soundOn} /> {soundOn ? 'Sound On' : 'Sound Off'}</div>
+                </div>
+              )}
+            </button>
           </div>
         </div>
 
@@ -147,6 +205,7 @@ export default function App() {
             </div>
 
             {/* BGaming control cluster — identical desktop & mobile */}
+            <ScaleBox scale={uiScale}>
             <BgControls
               balance={game.balance}
               betStr={game.betStr}
@@ -164,7 +223,19 @@ export default function App() {
               onPlay={onPlay}
               onStopAuto={game.stopAuto}
             />
+            </ScaleBox>
           </main>
+        </div>
+
+        <div className="bottom">
+          <div className="bottom-icons">
+            <div className={`ic${faved ? ' faved' : ''}`} title="Favorite" onClick={() => { const next = !faved; setFaved(next); localStorage.setItem('fav_plinko', String(next)); }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={faved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+          </div>
+          <div className="bottom-logo">MYBC</div>
         </div>
       </div>
 

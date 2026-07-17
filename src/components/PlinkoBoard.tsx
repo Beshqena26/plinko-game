@@ -150,7 +150,7 @@ export default function PlinkoBoard({
         seg: 0, segStart: performance.now(),
         segDur: FIRST_DROP_MS,
         jitter: (Math.random() - 0.5) * geo.gap * 0.14,
-        x: w / 2, y: geo.startY - 24,
+        x: w / 2, y: geo.startY - geo.gap * 1.05,
         trail: [], done: false,
       });
       onBallConsumed(id);
@@ -219,7 +219,7 @@ export default function PlinkoBoard({
         // Endpoints of the current segment
         let x0: number, y0: number, x1: number, y1: number, arc: number;
         if (ball.seg === 0) {
-          x0 = w / 2 + ball.jitter; y0 = startY - 24;
+          x0 = w / 2 + ball.jitter; y0 = startY - gap * 1.05;
           const p = bouncePin(geo, w, ball.dirs, 0);
           x1 = p.x; y1 = p.y - ballR - pinR;
           arc = 0;
