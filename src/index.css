@@ -167,11 +167,16 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* ===== ROW / MAIN ===== */
 .row { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; position: relative; }
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
-.game-area { flex: 1; min-height: 0; position: relative; }
+.game-area { flex: 1; min-height: 0; position: relative; overflow: hidden; }
 /* Wide screens: board sits right of center, history table in the left space
    (BGaming desktop arrangement) */
-/* Desktop: board and controls center on the full width; the history table
-   overlays the empty top-left corner of the board area (BGaming layout) */
+/* Desktop: board and control cluster sit right of center on the same axis
+   (identical offsets — PLAY orb exactly under the pyramid); the history
+   table gets the left space */
+@media (min-width: 1001px) {
+  .game-area { margin-left: 17%; }
+  .bgc { margin-left: 17%; }
+}
 
 /* ===== BGaming-style Lines rail (rows selector on the board edge) ===== */
 .lines-rail {
@@ -836,6 +841,88 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .fx-hist-row:hover { background: rgba(255,255,255,0.08); }
 @media (max-width: 1000px) { .fx-hist { display: none; } }
+
+/* ===== SESSION STATS (horizontal cells — desktop table footer + stats page) ===== */
+.fx-stats {
+  margin-top: 10px; padding: 12px 10px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.fx-stats-title {
+  font-size: 10px; font-weight: 700; color: var(--text-mid);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
+}
+.fx-stats-cells { display: flex; gap: 10px; }
+.fx-stats-cell {
+  flex: 1; display: flex; flex-direction: column; gap: 3px;
+}
+.fx-stats-cell span {
+  font-size: 10px; font-weight: 600; color: #C9C3E8;
+  text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+}
+.fx-stats-cell b {
+  font-size: 14px; font-weight: 700; color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+}
+
+/* ===== BOARD PAGER (BGaming mobile behavior) =====
+   The play field is a 2-page horizontal carousel: board ⇄ stats. The finger
+   drags the field itself (touchmove follows, snaps on release); header and
+   betting controls stay fixed. Desktop is locked to the board page. */
+.ga-track {
+  display: flex; width: 200%; height: 100%; flex: 1 1 auto; min-height: 0;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.ga-page {
+  position: relative; width: 50%; height: 100%; flex-shrink: 0;
+  display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+}
+.ga-page-stats { overflow-y: auto; align-items: center; justify-content: flex-start; }
+.mob-stats-empty { font-size: 12px; color: var(--text-mid); padding: 12px 0; }
+.mob-stats-hint {
+  position: absolute; left: 0; top: 42%; z-index: 30;
+  display: none; align-items: center; justify-content: center;
+  width: 22px; height: 52px; padding: 0;
+  background: rgba(35, 32, 78, 0.9); border: 1px solid var(--hairline);
+  border-left: none; border-radius: 0 10px 10px 0;
+  color: var(--accent); cursor: pointer;
+  animation: hintNudge 2.4s ease-in-out infinite;
+  -webkit-tap-highlight-color: transparent;
+}
+/* On the stats page the arrow flips to the right edge, pointing back at the game */
+.mob-stats-hint.right {
+  left: auto; right: 0;
+  border: 1px solid var(--hairline); border-right: none;
+  border-radius: 10px 0 0 10px;
+  animation-name: hintNudgeLeft;
+}
+@keyframes hintNudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+}
+@keyframes hintNudgeLeft {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-4px); }
+}
+@media (max-width: 1000px) {
+  .mob-stats-hint { display: flex; }
+  .main { touch-action: pan-y; }
+  /* The stats page shows the SAME table desktop has on its left — just
+     un-anchored: static, centered, comfortable width */
+  .ga-page-stats .fx-hist {
+    display: flex; position: static;
+    width: min(440px, 92%); margin: 26px auto 0;
+  }
+  .ga-page-stats .fx-hist-head { font-size: 13.5px; column-gap: 8px; }
+  .ga-page-stats .fx-hist-row { font-size: 13px; column-gap: 8px; padding: 7px 10px; }
+  .ga-page-stats .fx-stats-cell b { font-size: 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mob-stats-hint { animation: none; }
+}
+
+/* Session tiles at the top of the History drawer */
+.hist-session { margin-bottom: 12px; }
 
 /* Lines rail — white active chip on translucent list */
 .lines-rail-label { color: #D5D0F0; }

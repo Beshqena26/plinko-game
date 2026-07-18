@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { BetResult } from '../App';
+import type { SessionStats } from '../hooks/usePlinkoGame';
 import { fmt } from '../App';
 import type { RiskLevel } from '../utils/multipliers';
 import { getRtp } from '../utils/multipliers';
@@ -268,7 +269,7 @@ interface VerifyDataEntry {
   repro: { path: string; slot: number; pathMatch: boolean } | null;
 }
 
-export function HistoryDrawer({ open, onClose, rounds }: { open: boolean; onClose: () => void; rounds: BetResult[] }) {
+export function HistoryDrawer({ open, onClose, rounds, session }: { open: boolean; onClose: () => void; rounds: BetResult[]; session: SessionStats }) {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [verifying, setVerifying] = useState<Record<number, VerifyState>>({});
   const [verifyData, setVerifyData] = useState<Record<number, VerifyDataEntry>>({});
@@ -299,6 +300,11 @@ export function HistoryDrawer({ open, onClose, rounds }: { open: boolean; onClos
 
   return (
     <DrawerShell open={open} onClose={onClose} title="History">
+      <div className="fbs-stats fbs-stats-3 hist-session">
+        <div className="fbs-stat"><span className="fbs-stat-label">Rounds</span><span className="fbs-stat-val">{session.rounds}</span></div>
+        <div className="fbs-stat"><span className="fbs-stat-label">Total Bet</span><span className="fbs-stat-val">{fmt(session.wagered)}</span></div>
+        <div className="fbs-stat"><span className="fbs-stat-label">Net Profit</span><span className="fbs-stat-val" style={{ color: session.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>{session.profit < 0 ? '-' : '+'}{fmt(Math.abs(session.profit))}</span></div>
+      </div>
       {rounds.length === 0 && <div className="hist-empty">No rounds played yet</div>}
       {rounds.length > 0 && (
         <div className="hist-list">

@@ -13,6 +13,7 @@ export interface BetResult {
 export interface AutoSummary { rounds: number; wins: number; losses: number; profit: number }
 export interface QueuedBall { id: number; instant: boolean }
 export interface SystemAlert { id: number; msg: string }
+export interface SessionStats { rounds: number; wagered: number; profit: number }
 
 // Demo max-profit cap (Stake clips wins to a per-currency cap, never rejects).
 export const MAX_PROFIT = 10000;
@@ -55,6 +56,9 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
   const [alert, setAlert] = useState<SystemAlert | null>(null);
   const alertId = useRef(0);
   const notify = useCallback((msg: string) => setAlert({ id: ++alertId.current, msg }), []);
+  // Session totals (this page visit) — history is capped at 50 rows, so
+  // totals accumulate separately as each round settles.
+  const [session, setSession] = useState<SessionStats>({ rounds: 0, wagered: 0, profit: 0 });
 
   const idRef = useRef(0);
   const nonceRef = useRef(0);
@@ -133,6 +137,11 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     const pay = Math.min(+(bet * mult).toFixed(2), bet + MAX_PROFIT);
     const profit = pay - bet;
     setBalance(p => +(p + pay).toFixed(2));
+    setSession(s => ({
+      rounds: s.rounds + 1,
+      wagered: +(s.wagered + bet).toFixed(2),
+      profit: +(s.profit + profit).toFixed(2),
+    }));
     sound.land(mult);
     if (autoIds.current.has(ballId)) {
       autoIds.current.delete(ballId);
@@ -192,6 +201,6 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     ballQueue, instant, setInstant, history, ballsInFlight,
     serverSeed, clientSeed, setClientSeed, rotateSeed,
     paths, drop, onLand, onConsumed, startAuto, stopAuto,
-    alert, setAlert, notify,
+    alert, setAlert, notify, session,
   };
 }

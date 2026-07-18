@@ -10,8 +10,52 @@ import { usePlinkoGame } from './hooks/usePlinkoGame';
 import { fmt } from './utils/format';
 import { sound } from './utils/sound';
 
+import type { BetResult, SessionStats } from './hooks/usePlinkoGame';
+
 export type { BetResult, AutoSummary, QueuedBall } from './hooks/usePlinkoGame';
 export { fmt };
+
+/* Session totals (rounds / total bet / net profit) — desktop table footer,
+   history drawer header, and the mobile swipe-in panel all share this. */
+export function SessionStatsBlock({ session }: { session: SessionStats }) {
+  return (
+    <div className="fx-stats">
+      <div className="fx-stats-title">Session</div>
+      <div className="fx-stats-cells">
+        <div className="fx-stats-cell"><span>Rounds</span><b>{session.rounds}</b></div>
+        <div className="fx-stats-cell"><span>Total Bet</span><b>{fmt(session.wagered)}</b></div>
+        <div className="fx-stats-cell">
+          <span>Net Profit</span>
+          <b style={{ color: session.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {session.profit < 0 ? '-' : '+'}{fmt(Math.abs(session.profit))}
+          </b>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Bet history table (Time/Bet/Payout/Profit) — desktop left column and the
+   mobile swipe-in panel render the same rows. */
+function HistRows({ history, onRowClick }: { history: BetResult[]; onRowClick: () => void }) {
+  return (
+    <>
+      <div className="fx-hist-head">
+        <span>Time</span><span>Bet</span><span>Payout</span><span>Profit</span>
+      </div>
+      {history.slice(0, 8).map(h => (
+        <button key={h.id} className="fx-hist-row" onClick={onRowClick}>
+          <span>{new Date(h.time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{h.bet.toFixed(2)}</span>
+          <span>{h.pay.toFixed(2)}</span>
+          <span style={{ color: h.profit >= 0 ? '#46E144' : '#FF7B93' }}>
+            {h.profit >= 0 ? '+' : ''}{h.profit.toFixed(2)}
+          </span>
+        </button>
+      ))}
+    </>
+  );
+}
 
 const PlinkoIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="ico">
@@ -90,6 +134,7 @@ export default function App() {
   const [winBanner, setWinBanner] = useState<{ id: number; pay: number } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const game = usePlinkoGame(rows, risk);
   // Below 360×640 the control cluster scales uniformly instead of reflowing
@@ -135,6 +180,52 @@ export default function App() {
   const mults = getMultipliers(risk, rows);
   const handleSoundToggle = () => setSoundOn(sound.toggle());
   const handleMusicToggle = () => setMusicOn(sound.toggleMusic());
+
+  // Mobile board pager (BGaming behavior): the play field is a 2-page
+  // horizontal carousel — the finger drags the field itself, it follows the
+  // touch and snaps to the board page or the stats page. Header and betting
+  // controls stay fixed; page dots indicate position.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ x: number; y: number; horiz: boolean | null } | null>(null);
+  const pagerActive = () => window.innerWidth <= 1000;
+  const onPagerTouchStart = (e: React.TouchEvent) => {
+    if (!pagerActive() || infoOpen || pfOpen || histOpen || menuOpen) return;
+    const t = e.touches[0];
+    dragRef.current = { x: t.clientX, y: t.clientY, horiz: null };
+  };
+  const onPagerTouchMove = (e: React.TouchEvent) => {
+    const d = dragRef.current;
+    const track = trackRef.current;
+    if (!d || !track) return;
+    const t = e.touches[0];
+    const dx = t.clientX - d.x;
+    const dy = t.clientY - d.y;
+    if (d.horiz === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) d.horiz = Math.abs(dx) > Math.abs(dy);
+    if (!d.horiz) return;
+    const w = track.parentElement!.clientWidth;
+    // stats page is the LEFT page: open = 0%, game page = -50%
+    const base = statsOpen ? 0 : -50;
+    const pct = Math.max(-50, Math.min(0, base + (dx / w) * 50));
+    track.style.transition = 'none';
+    track.style.transform = `translateX(${pct}%)`;
+  };
+  const onPagerTouchEnd = (e: React.TouchEvent) => {
+    const d = dragRef.current;
+    const track = trackRef.current;
+    dragRef.current = null;
+    if (!d || !d.horiz || !track) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - d.x;
+    const w = track.parentElement!.clientWidth;
+    track.style.transition = '';
+    if (Math.abs(dx) > w * 0.18) {
+      setStatsOpen(dx > 0); // swipe right pulls the left stats page in
+      track.style.transform = '';
+    } else {
+      // snap back to the current page
+      track.style.transform = `translateX(${statsOpen ? 0 : -50}%)`;
+    }
+  };
 
   // Shared audio rows (desktop popover + mobile dots menu)
   const audioRows = (
@@ -241,44 +332,55 @@ export default function App() {
 
         <div className="row">
           <main className="main">
-            {/* Desktop bet history table (BGaming, left of the board) */}
-            <div className="fx-hist">
-              <div className="fx-hist-head">
-                <span>Time</span><span>Bet</span><span>Payout</span><span>Profit</span>
+            {/* Whole-screen pager (BGaming mobile behavior): the LEFT page is
+                the same history table desktop shows on its left side; the
+                RIGHT page is the game (board + controls). The finger drags
+                everything below the header; desktop is locked to the game
+                page and shows the table as its usual overlay. */}
+            <div
+              ref={trackRef}
+              className="ga-track"
+              style={{ transform: `translateX(${statsOpen ? 0 : -50}%)` }}
+              onTouchStart={onPagerTouchStart}
+              onTouchMove={onPagerTouchMove}
+              onTouchEnd={onPagerTouchEnd}
+            >
+              <div className="ga-page ga-page-stats">
+                <div className="fx-hist">
+                  <HistRows history={game.history} onRowClick={() => setHistOpen(true)} />
+                  {game.history.length === 0 && <div className="mob-stats-empty">No rounds yet — drop a ball!</div>}
+                  <SessionStatsBlock session={game.session} />
+                </div>
               </div>
-              {game.history.slice(0, 8).map(h => (
-                <button key={h.id} className="fx-hist-row" onClick={() => setHistOpen(true)}>
-                  <span>{new Date(h.time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-                  <span>{h.bet.toFixed(2)}</span>
-                  <span>{h.pay.toFixed(2)}</span>
-                  <span style={{ color: h.profit >= 0 ? '#46E144' : '#FF7B93' }}>
-                    {h.profit >= 0 ? '+' : ''}{h.profit.toFixed(2)}
-                  </span>
-                </button>
-              ))}
-            </div>
 
-            <div className="game-area">
-              <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
-                ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
+              <div className="ga-page ga-page-game">
+                {/* Desktop bet history table (BGaming, left of the board) + session totals */}
+                <div className="fx-hist fx-hist-desktop">
+                  <HistRows history={game.history} onRowClick={() => setHistOpen(true)} />
+                  <SessionStatsBlock session={game.session} />
+                </div>
 
-              {/* Lines rail: rows selector on the board edge */}
-              <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
-                <span className="lines-rail-label">Lines</span>
-                {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => {
-                  const disabled = game.ballsInFlight > 0 || game.autoRunning;
-                  return (
-                    <button
-                      key={n}
-                      className={`lines-rail-btn${rows === n ? ' active' : ''}`}
-                      onMouseEnter={() => { if (!disabled) sound.uiHover(); }}
-                      onClick={() => { if (rows !== n) sound.uiClick(); setRows(n); }}
-                      disabled={disabled}
-                    >{n}</button>
-                  );
-                })}
-              </div>
-            </div>
+                <div className="game-area">
+                  <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
+                    ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
+
+                  {/* Lines rail: rows selector on the board edge */}
+                  <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
+                    <span className="lines-rail-label">Lines</span>
+                    {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => {
+                      const disabled = game.ballsInFlight > 0 || game.autoRunning;
+                      return (
+                        <button
+                          key={n}
+                          className={`lines-rail-btn${rows === n ? ' active' : ''}`}
+                          onMouseEnter={() => { if (!disabled) sound.uiHover(); }}
+                          onClick={() => { if (rows !== n) sound.uiClick(); setRows(n); }}
+                          disabled={disabled}
+                        >{n}</button>
+                      );
+                    })}
+                  </div>
+                </div>
 
             {/* BGaming control cluster — identical desktop & mobile */}
             <ScaleBox scale={uiScale}>
@@ -300,6 +402,19 @@ export default function App() {
               onStopAuto={game.stopAuto}
             />
             </ScaleBox>
+              </div>
+            </div>
+
+            {/* Edge hint (mobile only) */}
+            <button
+              className={`mob-stats-hint${statsOpen ? ' right' : ''}`}
+              onClick={() => setStatsOpen(v => !v)}
+              aria-label={statsOpen ? 'Back to game' : 'Show session stats'}
+            >
+              {statsOpen
+                ? <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 6 9 12 15 18" /></svg>
+                : <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18" /></svg>}
+            </button>
           </main>
         </div>
 
@@ -321,7 +436,7 @@ export default function App() {
         serverSeed={game.serverSeed} clientSeed={game.clientSeed}
         setClientSeed={game.setClientSeed} onRotate={game.rotateSeed}
       />
-      <HistoryDrawer open={histOpen} onClose={() => setHistOpen(false)} rounds={game.history} />
+      <HistoryDrawer open={histOpen} onClose={() => setHistOpen(false)} rounds={game.history} session={game.session} />
 
       {game.autoSummary && (
         <div className="modal-overlay show" onClick={() => game.setAutoSummary(null)}>
