@@ -9,7 +9,8 @@ import {
 import type { PinGlow, TrailDot, WinPopup, Particle } from '../game/render';
 import { sound } from '../utils/sound';
 
-interface QueuedBall { id: number; instant: boolean }
+type GameSpeed = 'slow' | 'normal' | 'instant';
+interface QueuedBall { id: number; speed: GameSpeed }
 
 interface PlinkoBoardProps {
   rows: number;
@@ -28,6 +29,7 @@ interface PlinkoBoardProps {
 interface ActiveBall {
   dirs: number[];
   targetSlot: number;
+  rate: number;         // segment duration multiplier (slow speed)
   seg: number;          // current segment (0 = spawn→first pin)
   segStart: number;     // timestamp when this segment began
   segDur: number;       // per-segment duration with a little variance
@@ -39,6 +41,7 @@ interface ActiveBall {
 }
 
 const HOP_MS = 118;        // per-row hop duration
+const SLOW_RATE = 1.6;     // 'slow' speed stretches every segment
 const FIRST_DROP_MS = 200; // spawn → first pin
 const FINAL_DROP_MS = 210; // last pin → bucket
 
@@ -132,14 +135,14 @@ export default function PlinkoBoard({
     const { w, h } = sizeRef.current;
     const geo = geometry(w, h);
 
-    ballQueue.forEach(({ id, instant }) => {
+    ballQueue.forEach(({ id, speed }) => {
       if (spawnedRef.current.has(id)) return;
       spawnedRef.current.add(id);
       const dirs = paths.get(id) || [];
       const targetSlot = dirs.reduce((a, b) => a + b, 0);
 
       // Instant Bet: no animation — flash the bucket and settle immediately.
-      if (instant) {
+      if (speed === 'instant') {
         settle(id, targetSlot);
         onBallConsumed(id);
         return;
@@ -148,7 +151,8 @@ export default function PlinkoBoard({
       activeBallsRef.current.set(id, {
         dirs, targetSlot,
         seg: 0, segStart: performance.now(),
-        segDur: FIRST_DROP_MS,
+        segDur: FIRST_DROP_MS * (speed === 'slow' ? SLOW_RATE : 1),
+        rate: speed === 'slow' ? SLOW_RATE : 1,
         jitter: (Math.random() - 0.5) * geo.gap * 0.14,
         x: w / 2, y: geo.startY - geo.gap * 1.05,
         trail: [], done: false,
@@ -203,7 +207,7 @@ export default function PlinkoBoard({
           }
           ball.segStart += ball.segDur;
           ball.seg += 1;
-          ball.segDur = ball.seg === totalSegs ? FINAL_DROP_MS : HOP_MS * (0.92 + Math.random() * 0.16);
+          ball.segDur = (ball.seg === totalSegs ? FINAL_DROP_MS : HOP_MS * (0.92 + Math.random() * 0.16)) * ball.rate;
           if (ball.seg >= totalSegs) {
             ball.done = true;
             settle(id, ball.targetSlot);

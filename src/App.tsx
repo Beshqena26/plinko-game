@@ -408,8 +408,8 @@ export default function App() {
               totalAutoRounds={game.autoRounds === '0' ? '∞' : game.autoRounds}
               onPlay={onPlay}
               onStopAuto={game.stopAuto}
-              instant={game.instant}
-              setInstant={(v: boolean) => game.setInstant(v)}
+              speed={game.speed}
+              setSpeed={game.setSpeed}
             />
             </ScaleBox>
               </div>

@@ -220,7 +220,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   gap: 14px;
   /* Reserve the tallest state (Auto mode with the Number-of-bets stepper) so
      toggling modes never grows the cluster and reflows the board above. */
-  min-height: 190px;
+  min-height: 192px;
 }
 .bgc-main .play-btn { align-self: center; margin-top: 12px; }
 .play-btn-arc { margin-bottom: -4px; }
@@ -253,6 +253,24 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   font-size: 11px; font-weight: 700; color: var(--text-75);
 }
 .bgc-instant-label svg { color: var(--accent); }
+.bgc-speed { display: flex; gap: 4px; }
+/* Standalone mobile speed row (hidden on desktop where the card hosts it) */
+.bgc-speed-row {
+  display: none; width: min(440px, 100%); gap: 8px;
+}
+.bgc-speed-row .bgc-speed-btn {
+  flex: 1; height: 27px; font-size: 11px; border-radius: 8px;
+}
+.bgc-speed-btn {
+  height: 22px; padding: 0 8px;
+  background: var(--board); border: 1px solid var(--hairline); border-radius: 6px;
+  color: var(--text-75); font-size: 10px; font-weight: 700; font-family: inherit;
+  cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent;
+}
+.bgc-speed-btn.active {
+  background: var(--accent-glow); border-color: var(--accent-border);
+  color: #fff;
+}
 
 /* Number of bets (appears in Auto mode) */
 .bgc-nob { display: flex; flex-direction: column; gap: 3px; padding-top: 2px; }
@@ -297,6 +315,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Big round PLAY button (BGaming signature) */
 .play-btn {
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   width: 104px; height: 104px; border-radius: 50%;
   border: none; cursor: pointer; flex-shrink: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -819,6 +838,15 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 @media (max-width: 860px) {
   .hdr-desktop { display: none; }
   .hdr-mobile { display: flex; }
+  /* Speed moves out of the narrow card into its own full-width row */
+  .bgc-instant { display: none; }
+  .bgc-speed-row { display: flex; }
+  /* Constant 14px row rhythm in BOTH modes: the cluster is bottom-anchored
+     at Auto mode's total height, so the Manual/Auto height difference sits
+     invisibly ABOVE the cards (in board space) instead of between rows —
+     and the board canvas never reflows on mode switch. */
+  .bgc-main { min-height: 0; }
+  .bgc { gap: 14px; min-height: 283px; justify-content: flex-end; }
   .bottom { display: none; }
   .history-bar { height: 36px; padding: 0 12px; justify-content: flex-start; }
 }
@@ -1081,8 +1109,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   /* Cluster scales down but keeps the identical BGaming arrangement.
      Side cards flex symmetrically around the fixed PLAY orb so both columns
      mirror each other regardless of label widths. */
-  .bgc { gap: 10px; padding: 8px 12px calc(14px + env(safe-area-inset-bottom)); }
-  .bgc-main { width: 100%; gap: 12px; min-height: 196px; }
+  .bgc { gap: 14px; padding: 8px 12px calc(14px + env(safe-area-inset-bottom)); min-height: 301px; }
+  .bgc-main { width: 100%; gap: 12px; }
   .bgc-block { flex: 1 1 0; min-width: 0; max-width: 164px; gap: 6px; }
   .bgc-card { width: 100%; min-width: 0; padding: 7px; gap: 6px; }
   .bgc-opt { width: 100%; height: 30px; font-size: 11px; padding: 0 9px; gap: 6px; }

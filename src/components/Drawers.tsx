@@ -81,7 +81,7 @@ export function InfoDrawer({ open, onClose, risk, rows }: { open: boolean; onClo
         <div className="drw-steps">
           <div className="drw-step"><div className="drw-step-num">1</div><div className="drw-step-text">Set your bet amount, pick a risk level and the number of rows.</div></div>
           <div className="drw-step-arrow"><div className="drw-step-arrow-line"></div></div>
-          <div className="drw-step"><div className="drw-step-num">2</div><div className="drw-step-text">Press DROP BALL — the ball falls through the pegboard, bouncing left or right on every pin.</div></div>
+          <div className="drw-step"><div className="drw-step-num">2</div><div className="drw-step-text">Press PLAY — the ball falls through the pegboard, bouncing left or right on every pin. Hold PLAY down to auto-drop a stream of balls; release to stop.</div></div>
           <div className="drw-step-arrow"><div className="drw-step-arrow-line"></div></div>
           <div className="drw-step"><div className="drw-step-num">3</div><div className="drw-step-text">The slot where the ball lands decides your multiplier. Edge slots pay the most.</div></div>
           <div className="drw-step-arrow"><div className="drw-step-arrow-line"></div></div>

@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
+import type { GameSpeed } from '../hooks/usePlinkoGame';
 import { fmt } from '../utils/format';
 import { sound } from '../utils/sound';
 
@@ -13,8 +14,8 @@ export type BetMode = 'manual' | 'auto';
 
 interface Props {
   balance: number;
-  instant: boolean;
-  setInstant: (v: boolean) => void;
+  speed: GameSpeed;
+  setSpeed: (v: GameSpeed) => void;
   betStr: string;
   setBetStr: (v: string) => void;
   risk: RiskLevel;
@@ -58,7 +59,7 @@ export default function BgControls({
   balance, betStr, setBetStr, risk, setRisk, mode, setMode,
   autoRounds, setAutoRounds,
   autoRunning, ballsInFlight, autoPlayed, totalAutoRounds,
-  onPlay, onStopAuto, instant, setInstant,
+  onPlay, onStopAuto, speed, setSpeed,
 }: Props) {
   // No cap on simultaneous balls — PLAY can be spammed freely. Risk/lines/
   // mode still lock while any ball is in flight (the board must not change
@@ -102,6 +103,43 @@ export default function BgControls({
   // Hover blip for any enabled control (no-op on touch devices)
   const hover = (enabled: boolean) => () => { if (enabled) sound.uiHover(); };
 
+  // Hold-to-pour: keep PLAY pressed (manual mode) and balls pour continuously
+  // until release. A quick tap still drops exactly one ball — the pour only
+  // starts after a short hold threshold, and the synthetic click that fires
+  // on release is suppressed once pouring has begun.
+  const POUR_HOLD_MS = 250;
+  const POUR_EVERY_MS = 130;
+  const pourTimer = useRef<number | null>(null);
+  const pourInterval = useRef<number | null>(null);
+  const suppressClick = useRef(false);
+  const stopPour = () => {
+    if (pourTimer.current != null) { clearTimeout(pourTimer.current); pourTimer.current = null; }
+    if (pourInterval.current != null) { clearInterval(pourInterval.current); pourInterval.current = null; }
+  };
+  useEffect(() => stopPour, []);
+  const onPlayPointerDown = () => {
+    if (mode !== 'manual' || autoRunning) return;
+    suppressClick.current = false;
+    pourTimer.current = window.setTimeout(() => {
+      suppressClick.current = true;
+      onPlay();
+      pourInterval.current = window.setInterval(onPlay, POUR_EVERY_MS);
+    }, POUR_HOLD_MS);
+  };
+  const onPlayClick = () => {
+    if (suppressClick.current) { suppressClick.current = false; return; }
+    onPlay();
+  };
+
+  const speedChips = (['slow', 'normal', 'instant'] as GameSpeed[]).map(v => (
+    <button
+      key={v}
+      className={`bgc-speed-btn${speed === v ? ' active' : ''}`}
+      onMouseEnter={hover(speed !== v)}
+      onClick={() => { if (speed !== v) sound.uiClick(); setSpeed(v); }}
+    >{v === 'slow' ? 'Slow' : v === 'normal' ? 'Normal' : 'Instant'}</button>
+  ));
+
   return (
     <div className="bgc">
       <div className="bgc-main">
@@ -129,7 +167,15 @@ export default function BgControls({
             <span className="play-btn-count">{remaining}</span>
           </button>
         ) : (
-          <button className="play-btn" onClick={onPlay} disabled={balance < MIN_BET}>
+          <button
+            className="play-btn"
+            onClick={onPlayClick}
+            onPointerDown={onPlayPointerDown}
+            onPointerUp={stopPour}
+            onPointerLeave={stopPour}
+            onPointerCancel={stopPour}
+            disabled={balance < MIN_BET}
+          >
             <svg className="play-btn-arc" viewBox="0 0 60 20" width="52" height="17" fill="none">
               <path d="M4 16 Q 14 2 26 14 Q 38 26 52 5" stroke="#E9A53C" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="0.1 6.5" />
               <circle cx="53" cy="4.4" r="3.6" fill="#E9375B" />
@@ -173,17 +219,15 @@ export default function BgControls({
               </div>
             )}
             <div className="bgc-instant">
-              <span className="bgc-instant-label"><BoltSVG /> Instant</span>
-              <button
-                className={`audio-switch${instant ? ' on' : ''}`}
-                onMouseEnter={hover(true)}
-                onClick={() => { sound.uiClick(); setInstant(!instant); }}
-                aria-label="Toggle instant bet"
-              />
+              <span className="bgc-instant-label"><BoltSVG /> Speed</span>
+              <div className="bgc-speed">{speedChips}</div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Mobile: Speed gets its own full-width row (the card is too narrow) */}
+      <div className="bgc-speed-row">{speedChips}</div>
 
       <div className="bgc-bet-row">
         <div className="bgc-bet-side">

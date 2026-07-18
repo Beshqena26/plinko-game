@@ -11,7 +11,8 @@ export interface BetResult {
 }
 
 export interface AutoSummary { rounds: number; wins: number; losses: number; profit: number }
-export interface QueuedBall { id: number; instant: boolean }
+export type GameSpeed = 'slow' | 'normal' | 'instant';
+export interface QueuedBall { id: number; speed: GameSpeed }
 export interface SystemAlert { id: number; msg: string }
 export interface SessionStats { rounds: number; wagered: number; profit: number }
 
@@ -47,7 +48,17 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
   const [autoProfit, setAutoProfit] = useState(0);
   const [autoSummary, setAutoSummary] = useState<AutoSummary | null>(null);
   const [ballQueue, setBallQueue] = useState<QueuedBall[]>([]);
-  const [instant, setInstant] = useState(() => localStorage.getItem('plinko_instant') === 'true');
+  // Ball speed: slow / normal / instant (boss spec — default normal;
+  // migrates the old boolean instant setting)
+  const [speed, setSpeedState] = useState<GameSpeed>(() => {
+    const v = localStorage.getItem('plinko_speed');
+    if (v === 'slow' || v === 'normal' || v === 'instant') return v;
+    return localStorage.getItem('plinko_instant') === 'true' ? 'instant' : 'normal';
+  });
+  const setSpeed = useCallback((v: GameSpeed) => {
+    setSpeedState(v);
+    localStorage.setItem('plinko_speed', v);
+  }, []);
   const [history, setHistory] = useState<BetResult[]>([]);
   const [ballsInFlight, setBallsInFlight] = useState(0);
   const [serverSeed, setServerSeed] = useState(() => randomHex(32));
@@ -70,15 +81,14 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
   const autoDoneRef = useRef(false);
   const pending = useRef(new Map<number, PendingBall>());
   const ledgerRef = useRef(0); // settled balance, written at drop time
-  const instantRef = useRef(instant);
-  instantRef.current = instant;
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
   const balanceRef = useRef(balance);
   balanceRef.current = balance;
   const betRef = useRef(1);
   betRef.current = Math.max(0, parseFloat(betStr) || 0);
 
   useEffect(() => { ledgerRef.current = balance; }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { localStorage.setItem('plinko_instant', String(instant)); }, [instant]);
 
   // Demo refill: a busted balance would permanently brick the PLAY button.
   useEffect(() => {
@@ -116,7 +126,7 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     const pay = Math.min(+(bet * mult).toFixed(2), bet + MAX_PROFIT);
     ledgerRef.current = +(ledgerRef.current - bet + pay).toFixed(2);
     localStorage.setItem('plinko_balance', String(ledgerRef.current));
-    setBallQueue(p => [...p, { id, instant: instantRef.current }]);
+    setBallQueue(p => [...p, { id, speed: speedRef.current }]);
     return true;
   }, [rows, risk, paths, notify]);
 
@@ -198,7 +208,7 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     balance, betStr, setBetStr, bet: betRef.current,
     autoRunning, autoRounds, setAutoRounds, autoPlayed, autoProfit,
     autoSummary, setAutoSummary,
-    ballQueue, instant, setInstant, history, ballsInFlight,
+    ballQueue, speed, setSpeed, history, ballsInFlight,
     serverSeed, clientSeed, setClientSeed, rotateSeed,
     paths, drop, onLand, onConsumed, startAuto, stopAuto,
     alert, setAlert, notify, session,
