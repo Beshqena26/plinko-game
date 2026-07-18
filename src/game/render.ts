@@ -40,17 +40,43 @@ export function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: numb
   ctx.restore();
 }
 
+// Entry hole rides higher when the apex pin is shown so the hole, the
+// falling ball and the pin never visually merge.
+export const entryHoleOffset = (spike: boolean) => (spike ? 1.55 : 1.05);
+
 // Dark entry hole the ball drops out of (BGaming signature).
-export function drawEntryHole(ctx: CanvasRenderingContext2D, geo: BoardGeometry, w: number) {
+export function drawEntryHole(ctx: CanvasRenderingContext2D, geo: BoardGeometry, w: number, spike = false) {
   const r = Math.max(9, geo.gap * 0.42);
   const x = w / 2;
-  const y = geo.startY - geo.gap * 1.05;
+  const y = geo.startY - geo.gap * entryHoleOffset(spike);
   const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r);
   g.addColorStop(0, '#080617');
   g.addColorStop(0.75, '#0E0B20');
   g.addColorStop(1, 'rgba(14, 11, 32, 0.25)');
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+}
+
+// Cosmetic apex "spike" pin at the pyramid tip (test toggle) — visual only,
+// the seed-derived path is untouched.
+export function apexPinPos(geo: BoardGeometry, w: number) {
+  return { x: w / 2, y: geo.startY - geo.gap * 0.72 };
+}
+export function drawApexPin(ctx: CanvasRenderingContext2D, geo: BoardGeometry, w: number) {
+  const { x, y } = apexPinPos(geo, w);
+  const pinR = geo.pinR * 1.25; // the tip pin reads slightly larger
+  ctx.beginPath();
+  ctx.arc(x, y + pinR * 0.35, pinR * 1.05, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(10, 8, 24, 0.4)';
+  ctx.fill();
+  const g = ctx.createRadialGradient(x - pinR * 0.35, y - pinR * 0.4, pinR * 0.1, x, y, pinR);
+  g.addColorStop(0, '#FFFFFF');
+  g.addColorStop(0.65, '#E9E5FA');
+  g.addColorStop(1, '#B8B2D9');
+  ctx.beginPath();
+  ctx.arc(x, y, pinR, 0, Math.PI * 2);
   ctx.fillStyle = g;
   ctx.fill();
 }

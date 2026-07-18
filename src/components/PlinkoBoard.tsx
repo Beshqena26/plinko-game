@@ -4,7 +4,7 @@ import { getGeometry, bucketAt } from '../game/geometry';
 import type { BoardGeometry } from '../game/geometry';
 import {
   drawEntryHole, drawPinGlows, drawPins, drawBuckets, drawParticles,
-  drawBall, drawWinPopups, spawnWinParticles,
+  drawBall, drawWinPopups, spawnWinParticles, drawApexPin, apexPinPos, entryHoleOffset,
 } from '../game/render';
 import type { PinGlow, TrailDot, WinPopup, Particle } from '../game/render';
 import { sound } from '../utils/sound';
@@ -19,6 +19,9 @@ interface PlinkoBoardProps {
   ballQueue: QueuedBall[];
   onBallConsumed: (id: number) => void;
   paths: Map<number, number[]>;
+  /* Cosmetic apex "spike" pin at the pyramid tip (test toggle) — the ball
+     visibly bounces off it on its first segment; the path math is untouched. */
+  spike?: boolean;
 }
 
 // The ball is a scripted animation along the seed-derived path — the exact
@@ -56,7 +59,7 @@ function bucketCenterX(geo: BoardGeometry, slot: number) {
 }
 
 export default function PlinkoBoard({
-  rows, multipliers, bet, onBallLand, ballQueue, onBallConsumed, paths,
+  rows, multipliers, bet, onBallLand, ballQueue, onBallConsumed, paths, spike = false,
 }: PlinkoBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderLoopRef = useRef<number>(0);
@@ -68,6 +71,8 @@ export default function PlinkoBoard({
   const winPopupsRef = useRef<WinPopup[]>([]);
   const particlesRef = useRef<Particle[]>([]);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; slot: number } | null>(null);
+  const spikeRef = useRef(spike);
+  spikeRef.current = spike;
 
   const geometry = useCallback(
     (w: number, h: number): BoardGeometry => getGeometry(w, h, rows),
@@ -150,7 +155,7 @@ export default function PlinkoBoard({
         seg: 0, segStart: performance.now(),
         segDur: FIRST_DROP_MS,
         jitter: (Math.random() - 0.5) * geo.gap * 0.14,
-        x: w / 2, y: geo.startY - geo.gap * 1.05,
+        x: w / 2, y: geo.startY - geo.gap * entryHoleOffset(spikeRef.current),
         trail: [], done: false,
       });
       onBallConsumed(id);
@@ -178,10 +183,11 @@ export default function PlinkoBoard({
       const now = Date.now();
       const bucketTopY = geo.bucketTopY;
 
-      drawEntryHole(ctx, geo, w);
+      drawEntryHole(ctx, geo, w, spikeRef.current);
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       drawPinGlows(ctx, pinGlowsRef.current, pinR, now);
       drawPins(ctx, geo, pinGlowsRef.current);
+      if (spikeRef.current) drawApexPin(ctx, geo, w);
       drawBuckets(ctx, geo, multipliers, flashRef.current, tooltip?.slot ?? null, now);
 
       particlesRef.current = particlesRef.current.filter(p => p.life > 0);
@@ -219,10 +225,29 @@ export default function PlinkoBoard({
         // Endpoints of the current segment
         let x0: number, y0: number, x1: number, y1: number, arc: number;
         if (ball.seg === 0) {
-          x0 = w / 2 + ball.jitter; y0 = startY - gap * 1.05;
+          x0 = w / 2 + ball.jitter; y0 = startY - gap * entryHoleOffset(spikeRef.current);
           const p = bouncePin(geo, w, ball.dirs, 0);
           x1 = p.x; y1 = p.y - ballR - pinR;
           arc = 0;
+          if (spikeRef.current) {
+            // visual bounce off the apex pin: fall to it, then hop to row 0
+            const apex = apexPinPos(geo, w);
+            const apexY = apex.y - ballR - pinR;
+            if (t < 0.45) {
+              const tt = t / 0.45;
+              ball.x = x0 + (apex.x - x0) * tt;
+              ball.y = y0 + (apexY - y0) * tt * tt;
+            } else {
+              const tt = (t - 0.45) / 0.55;
+              const ease = tt * tt;
+              ball.x = apex.x + (x1 - apex.x) * tt;
+              ball.y = apexY + (y1 - apexY) * ease - Math.sin(Math.PI * tt) * gap * 0.25;
+            }
+            ball.trail.push({ x: ball.x, y: ball.y, time: now });
+            while (ball.trail.length > 10) ball.trail.shift();
+            drawBall(ctx, ball.x, ball.y, ballR, ball.trail, now);
+            return;
+          }
         } else if (ball.seg < ball.dirs.length) {
           const a = bouncePin(geo, w, ball.dirs, ball.seg - 1);
           const b = bouncePin(geo, w, ball.dirs, ball.seg);
