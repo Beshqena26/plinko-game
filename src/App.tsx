@@ -86,9 +86,6 @@ const SoundSVG = ({ on }: { on: boolean }) => (
 const InfoSVG = () => (
   <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><line x1="12" y1="11" x2="12" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="8" r="1" fill="currentColor"/></svg>
 );
-const BoltHdrSVG = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></svg>
-);
 
 // Scales its child as one rigid unit (BGaming stage behavior): the child is
 // laid out at full design size, then transform-scaled; the wrapper's height
@@ -289,7 +286,6 @@ export default function App() {
           <div className="header-right">
             <button className="hdr-btn hdr-desktop" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
             <button className="hdr-btn hdr-desktop" onClick={() => setPfOpen(true)} title="Fair Play"><ShieldSVG /></button>
-            <button className={`hdr-btn hdr-desktop${game.instant ? ' hdr-on' : ''}`} onClick={() => game.setInstant(v => !v)} title="Instant Bet"><BoltHdrSVG /></button>
             <div className="hdr-audio-wrap hdr-desktop">
               <button
                 className={`hdr-btn${audioOpen ? ' hdr-on' : ''}`}
@@ -311,7 +307,6 @@ export default function App() {
               {menuOpen && (
                 <div className="dots-menu open" onClick={(e) => e.stopPropagation()}>
                   <div className="dots-menu-item" onClick={() => { setPfOpen(true); setMenuOpen(false); }}><ShieldSVG /> Fair Play</div>
-                  <div className="dots-menu-item" onClick={() => { game.setInstant(v => !v); setMenuOpen(false); }}><BoltHdrSVG /> {game.instant ? 'Instant Bet On' : 'Instant Bet Off'}</div>
                   <div className="dots-menu-item" onClick={() => { setInfoOpen(true); setMenuOpen(false); }}><InfoSVG /> How to Play</div>
                   <div className="dots-menu-audio">{audioRows}</div>
                 </div>
@@ -400,6 +395,8 @@ export default function App() {
               totalAutoRounds={game.autoRounds === '0' ? '∞' : game.autoRounds}
               onPlay={onPlay}
               onStopAuto={game.stopAuto}
+              instant={game.instant}
+              setInstant={(v: boolean) => game.setInstant(v)}
             />
             </ScaleBox>
               </div>

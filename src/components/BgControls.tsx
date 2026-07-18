@@ -13,6 +13,8 @@ export type BetMode = 'manual' | 'auto';
 
 interface Props {
   balance: number;
+  instant: boolean;
+  setInstant: (v: boolean) => void;
   betStr: string;
   setBetStr: (v: string) => void;
   risk: RiskLevel;
@@ -39,6 +41,10 @@ const ThumbSVG = () => (
   <svg viewBox="0 0 24 24" width="13" height="13" fill="#22C55E"><path d="M21.3 10.1C20.7 9.4 19.9 9 19 9H14.4L15 7.6C15.8 5.5 14.7 3.1 12.6 2.3C12.1 2.1 11.6 2 11.1 2C10.7 2 10.3 2.2 10.2 2.6L7.3 9H5C3.3 9 2 10.3 2 12V19C2 20.7 3.3 22 5 22H17.7C19.2 22 20.4 21 20.7 19.5L22 12.5C22.1 11.7 21.9 10.8 21.3 10.1ZM7 20H5C4.4 20 4 19.6 4 19V12C4 11.4 4.4 11 5 11H7V20Z"/></svg>
 );
 
+const BoltSVG = () => (
+  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l1-8z"/></svg>
+);
+
 const RISKS: { v: RiskLevel; l: string; ico: React.ReactNode }[] = [
   { v: 'high', l: 'High', ico: <FlameSVG /> },
   { v: 'medium', l: 'Normal', ico: <DiceSVG /> },
@@ -52,13 +58,11 @@ export default function BgControls({
   balance, betStr, setBetStr, risk, setRisk, mode, setMode,
   autoRounds, setAutoRounds,
   autoRunning, ballsInFlight, autoPlayed, totalAutoRounds,
-  onPlay, onStopAuto,
+  onPlay, onStopAuto, instant, setInstant,
 }: Props) {
-  // Up to MAX_CONCURRENT balls may fall together; PLAY disables only when
-  // the next press would exceed that. Risk/lines/mode still lock while any
-  // ball is in flight (the board must not change under live balls).
-  const MAX_CONCURRENT = 6;
-  const flightFull = ballsInFlight >= MAX_CONCURRENT;
+  // No cap on simultaneous balls — PLAY can be spammed freely. Risk/lines/
+  // mode still lock while any ball is in flight (the board must not change
+  // under live balls).
   const locked = autoRunning || ballsInFlight > 0;
   const betLocked = autoRunning; // bet edits are safe mid-flight (per-ball snapshot)
   const bet = Math.max(0, parseFloat(betStr) || 0);
@@ -125,7 +129,7 @@ export default function BgControls({
             <span className="play-btn-count">{remaining}</span>
           </button>
         ) : (
-          <button className="play-btn" onClick={onPlay} disabled={flightFull || balance < MIN_BET}>
+          <button className="play-btn" onClick={onPlay} disabled={balance < MIN_BET}>
             <svg className="play-btn-arc" viewBox="0 0 60 20" width="52" height="17" fill="none">
               <path d="M4 16 Q 14 2 26 14 Q 38 26 52 5" stroke="#E9A53C" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="0.1 6.5" />
               <circle cx="53" cy="4.4" r="3.6" fill="#E9375B" />
@@ -168,6 +172,15 @@ export default function BgControls({
                 </div>
               </div>
             )}
+            <div className="bgc-instant">
+              <span className="bgc-instant-label"><BoltSVG /> Instant</span>
+              <button
+                className={`audio-switch${instant ? ' on' : ''}`}
+                onMouseEnter={hover(true)}
+                onClick={() => { sound.uiClick(); setInstant(!instant); }}
+                aria-label="Toggle instant bet"
+              />
+            </div>
           </div>
         </div>
       </div>

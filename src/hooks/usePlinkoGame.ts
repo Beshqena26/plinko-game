@@ -17,7 +17,7 @@ export interface SessionStats { rounds: number; wagered: number; profit: number 
 
 // Demo max-profit cap (Stake clips wins to a per-currency cap, never rejects).
 export const MAX_PROFIT = 10000;
-export const MAX_CONCURRENT_BALLS = 20;
+export const MAX_CONCURRENT_BALLS = 200; // safety backstop only — PLAY is uncapped
 
 interface PendingBall {
   bet: number; nonce: number; dirs: number[]; slot: number; mult: number;
@@ -182,7 +182,7 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
         return;
       }
       c++; setAutoPlayed(c);
-      setTimeout(tick, 1050); // BGaming's observed auto cadence (~1.1s/bet)
+      setTimeout(tick, 120); // no artificial cadence — balls stream out like rapid manual play
     };
     tick();
   }, [drop, autoRounds, stopAuto, notify]);
