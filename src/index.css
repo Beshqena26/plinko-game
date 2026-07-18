@@ -363,8 +363,10 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .bgc-balance b { color: var(--text); font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
 
 /* ===== AUDIO CONTROL PANEL (desktop header + mobile menu) ===== */
-.hdr-audio-wrap { position: relative; display: flex; }
-.hdr-dots-wrap { position: relative; display: flex; }
+/* display is owned by the .hdr-desktop / .hdr-mobile visibility classes —
+   declaring it here would override them and leak menus across breakpoints */
+.hdr-audio-wrap { position: relative; }
+.hdr-dots-wrap { position: relative; }
 .dots-menu-audio {
   display: flex; flex-direction: column; gap: 12px;
   margin-top: 4px; padding: 12px;

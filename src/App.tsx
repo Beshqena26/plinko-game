@@ -83,12 +83,6 @@ const MusicSVG = ({ on }: { on: boolean }) => (
 const SoundSVG = ({ on }: { on: boolean }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />{on && <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />}</svg>
 );
-const ApexSVG = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="5" r="2" fill="currentColor" stroke="none" />
-    <path d="M6 19h12M8 13.5h8" opacity="0.7" />
-  </svg>
-);
 const InfoSVG = () => (
   <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/><line x1="12" y1="11" x2="12" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><circle cx="12" cy="8" r="1" fill="currentColor"/></svg>
 );
@@ -138,8 +132,6 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
   const [statsOpen, setStatsOpen] = useState(false);
-  // Cosmetic apex-pin test toggle (visual only)
-  const [spike, setSpike] = useState(() => localStorage.getItem('plinko_spike') === 'true');
 
   const game = usePlinkoGame(rows, risk);
   // Below 360×640 the control cluster scales uniformly instead of reflowing
@@ -307,11 +299,6 @@ export default function App() {
               )}
             </div>
             <button className="hdr-btn hdr-desktop hdr-info" onClick={() => setInfoOpen(true)} title="How to Play">i</button>
-            <button
-              className={`hdr-btn${spike ? ' hdr-on' : ''}`}
-              onClick={() => setSpike(v => { localStorage.setItem('plinko_spike', String(!v)); return !v; })}
-              title="Apex Pin (test)"
-            ><ApexSVG /></button>
             <button className="hdr-btn hdr-mobile" onClick={() => setHistOpen(true)} title="History"><ClockSVG /></button>
             <div className="hdr-dots-wrap hdr-mobile">
               <button className="hdr-btn hdr-dots" onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }} title="Menu">
@@ -370,7 +357,7 @@ export default function App() {
 
                 <div className="game-area">
                   <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
-                    ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} spike={spike} />
+                    ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
 
                   {/* Mobile: compact session totals pinned top-left of the board,
                       stacked vertically below the win-alert position */}
