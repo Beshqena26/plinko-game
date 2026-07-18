@@ -359,6 +359,19 @@ export default function App() {
                   <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
                     ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
 
+                  {/* Mobile: compact session totals pinned top-left of the board,
+                      stacked vertically below the win-alert position */}
+                  <div className="mob-session" aria-hidden="true">
+                    <div><span>Rounds</span><b>{game.session.rounds}</b></div>
+                    <div><span>Total Bet</span><b>{fmt(game.session.wagered)}</b></div>
+                    <div>
+                      <span>Profit</span>
+                      <b style={{ color: game.session.profit >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                        {game.session.profit < 0 ? '-' : '+'}{fmt(Math.abs(game.session.profit))}
+                      </b>
+                    </div>
+                  </div>
+
                   {/* Lines rail: rows selector on the board edge */}
                   <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
                     <span className="lines-rail-label">Lines</span>

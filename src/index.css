@@ -165,9 +165,11 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 
 /* ===== ROW / MAIN ===== */
-.row { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden; position: relative; }
-.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
-.game-area { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.row { display: flex; flex: 1 1 auto; min-height: 0; overflow: clip; position: relative; }
+/* overflow: clip (not hidden) — the browser must never be able to scroll
+   the pager container (tap-focus on off-screen page content would) */
+.main { flex: 1; display: flex; flex-direction: column; overflow: clip; min-width: 0; position: relative; }
+.game-area { flex: 1; min-height: 0; position: relative; overflow: clip; }
 /* Wide screens: board sits right of center, history table in the left space
    (BGaming desktop arrangement) */
 /* Desktop: board and control cluster sit right of center on the same axis
@@ -891,6 +893,22 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .ga-page-stats { overflow-y: auto; align-items: center; justify-content: flex-start; }
 .mob-stats-empty { font-size: 12px; color: var(--text-mid); padding: 12px 0; }
+/* Compact session totals on the board's top-left (mobile only) — sits in the
+   empty corner below where the win banner appears */
+.mob-session {
+  position: absolute; left: 10px; top: 92px; z-index: 20;
+  display: none; flex-direction: column; gap: 6px;
+  pointer-events: none;
+}
+.mob-session > div { display: flex; flex-direction: column; gap: 1px; }
+.mob-session span {
+  font-size: 9px; font-weight: 700; color: var(--text-mid);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.mob-session b {
+  font-size: 12px; font-weight: 700; color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+}
 .mob-stats-hint {
   position: absolute; left: 0; top: 42%; z-index: 30;
   display: none; align-items: center; justify-content: center;
@@ -918,6 +936,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 @media (max-width: 1000px) {
   .mob-stats-hint { display: flex; }
+  .mob-session { display: flex; }
   .main { touch-action: pan-y; }
   /* The stats page shows the SAME table desktop has on its left — just
      un-anchored: static, centered, comfortable width */
