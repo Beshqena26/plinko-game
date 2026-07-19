@@ -307,6 +307,10 @@ export function usePlinkoGame(rows: number, risk: RiskLevel) {
     freeRef.current = null;
     setFreeSummary(null);
     setFreeEnding(false);
+    // An auto run inside the grant also queued an Auto Play summary — the
+    // free-rounds summary already told that story, so drop it instead of
+    // popping a second stale modal after Continue.
+    setAutoSummary(null);
     localStorage.removeItem('plinko_free');
   }, []);
 
