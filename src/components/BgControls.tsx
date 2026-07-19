@@ -208,8 +208,10 @@ export default function BgControls({
               <span className="bgc-ico"><b style={{ color: '#F43F5E' }}>A</b></span>
               Auto
             </button>
-            {mode === 'auto' && (
-              <div className="bgc-nob">
+            {/* Always in the layout — invisible in Manual so the card keeps the
+                exact same height in both modes (no jump on mode switch) */}
+            {(
+              <div className={`bgc-nob${mode === 'auto' ? '' : ' bgc-nob-ghost'}`}>
                 <span className="bgc-nob-label">Number of bets</span>
                 <div className="bgc-nob-row">
                   <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[0])} onClick={() => stepAuto(-1)}>−</button>
