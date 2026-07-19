@@ -442,25 +442,32 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .audio-slider:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ===== FREE ROUNDS (ported from limbo/hilo) ===== */
+/* One 30px row (same height as .bgc-pill / the bet row it replaces) so the
+   free→paid swap never shifts the layout */
 .free-round-slot {
   width: min(440px, 100%);
-  display: flex; flex-direction: column; gap: 6px;
-  padding: 10px 14px;
+  height: 30px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 12px;
+  white-space: nowrap;
   background: linear-gradient(135deg, rgba(247, 147, 26, 0.15), rgba(247, 147, 26, 0.05));
-  border: 1px solid rgba(247, 147, 26, 0.35); border-radius: 10px;
+  border: 1px solid rgba(247, 147, 26, 0.35); border-radius: 8px;
 }
-.frs-row1, .frs-row2 { display: flex; align-items: center; gap: 8px; }
 .free-round-ico { display: flex; color: var(--accent); }
 .frs-label {
-  font-size: 12px; font-weight: 800; color: var(--accent);
+  font-size: 11px; font-weight: 800; color: var(--accent);
   text-transform: uppercase; letter-spacing: 0.05em;
 }
 .frs-count {
-  margin-left: auto; font-size: 13px; font-weight: 700; color: #fff;
+  font-size: 12.5px; font-weight: 700; color: #fff;
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
 }
-.frs-bet { font-size: 12px; font-weight: 700; color: var(--text-75); }
-.frs-tw { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-mid); }
+.frs-bet { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-75); }
+.frs-tw { font-size: 12px; font-weight: 600; color: var(--text-mid); }
+/* Tight phones: drop the wordy label, the gift icon + counter carry it */
+@media (max-width: 400px) {
+  .frs-label { display: none; }
+}
 .frs-tw b {
   color: var(--green); font-weight: 800;
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
@@ -1206,6 +1213,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
      Width capped to the card row's outer edges (164+12+88+12+164) so the
      pills stay with the cluster instead of flying to the screen edges. */
   .bgc-bet-row { width: min(440px, 100%); gap: 10px; margin-top: 2px; }
+  /* Mobile pills are 32px, so the free slot matches to stay jump-free */
+  .free-round-slot { height: 32px; margin-top: 2px; }
   .bgc-bet-side { gap: 8px; }
   .bgc-pill { flex: 0 0 44px; min-width: 44px; height: 32px; font-size: 11px; padding: 0; }
   .bgc-bet-display { gap: 6px; }

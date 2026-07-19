@@ -249,17 +249,15 @@ export default function BgControls({
       {/* Mobile: Speed gets its own full-width row (the card is too narrow) */}
       <div className="bgc-speed-row">{speedChips}</div>
 
+      {/* Free slot is a single 30px line — exactly the bet row's height, so
+          the swap back to the bet row when the grant ends cannot move the layout */}
       {freeGrant ? (
         <div className="free-round-slot">
-          <div className="frs-row1">
-            <span className="free-round-ico"><GiftSVG /></span>
-            <span className="frs-label">Free Round</span>
-            <span className="frs-count">{Math.min(freeGrant.roundsUsed, freeGrant.roundsTotal)}/{freeGrant.roundsTotal}</span>
-          </div>
-          <div className="frs-row2">
-            <span className="frs-bet">Bet {fmt(freeGrant.betAmount)}</span>
-            <span className="frs-tw">Total Win <b>+{fmt(freeGrant.winnings)}</b></span>
-          </div>
+          <span className="free-round-ico"><GiftSVG /></span>
+          <span className="frs-label">Free Round</span>
+          <span className="frs-count">{Math.min(freeGrant.roundsUsed, freeGrant.roundsTotal)}/{freeGrant.roundsTotal}</span>
+          <span className="frs-bet">Bet {fmt(freeGrant.betAmount)}</span>
+          <span className="frs-tw">Total Win <b>+{fmt(freeGrant.winnings)}</b></span>
         </div>
       ) : (
       <div className="bgc-bet-row">
