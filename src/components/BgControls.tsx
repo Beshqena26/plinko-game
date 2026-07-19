@@ -92,6 +92,9 @@ export default function BgControls({
     if (next != null) { sound.uiClick(); setBetStr(next.toFixed(2)); }
   };
 
+  // Hover blip for any enabled control (no-op on touch devices)
+  const hover = (enabled: boolean) => () => { if (enabled) sound.uiHover(); };
+
   const stepAuto = (dir: 1 | -1) => {
     const i = AUTO_STEPS.indexOf(autoRounds);
     const cur = i === -1 ? 1 : i;
@@ -99,9 +102,6 @@ export default function BgControls({
     if (AUTO_STEPS[next] !== autoRounds) sound.uiClick();
     setAutoRounds(AUTO_STEPS[next]);
   };
-
-  // Hover blip for any enabled control (no-op on touch devices)
-  const hover = (enabled: boolean) => () => { if (enabled) sound.uiHover(); };
 
   // Hold-to-pour: keep PLAY pressed (manual mode) and balls pour continuously
   // until release. A quick tap still drops exactly one ball — the pour only
@@ -208,18 +208,16 @@ export default function BgControls({
               <span className="bgc-ico"><b style={{ color: '#F43F5E' }}>A</b></span>
               Auto
             </button>
-            {/* Always in the layout — invisible in Manual so the card keeps the
-                exact same height in both modes (no jump on mode switch) */}
-            {(
-              <div className={`bgc-nob${mode === 'auto' ? '' : ' bgc-nob-ghost'}`}>
-                <span className="bgc-nob-label">Number of bets</span>
-                <div className="bgc-nob-row">
-                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[0])} onClick={() => stepAuto(-1)}>−</button>
-                  <span className="bgc-nob-val">{autoRounds === '0' ? '∞' : autoRounds}</span>
-                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[AUTO_STEPS.length - 1]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[AUTO_STEPS.length - 1])} onClick={() => stepAuto(1)}>+</button>
-                </div>
+            {/* Always present (dimmed in Manual) — the card never changes
+                height, so switching modes cannot move the layout */}
+            <div className={`bgc-nob${mode === 'auto' ? '' : ' bgc-nob-off'}`}>
+              <span className="bgc-nob-label">Number of bets</span>
+              <div className="bgc-nob-row">
+                <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[0])} onClick={() => stepAuto(-1)}>−</button>
+                <span className="bgc-nob-val">{autoRounds === '0' ? '∞' : autoRounds}</span>
+                <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[AUTO_STEPS.length - 1]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[AUTO_STEPS.length - 1])} onClick={() => stepAuto(1)}>+</button>
               </div>
-            )}
+            </div>
             <div className="bgc-instant">
               <span className="bgc-instant-label"><BoltSVG /> Speed</span>
               <div className="bgc-speed">{speedChips}</div>
