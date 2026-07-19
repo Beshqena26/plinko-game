@@ -281,7 +281,6 @@ export default function App() {
   if (loading) return (
     <div className="loading-screen">
       <div className="loading-content">
-        <img className="loading-logo" src="/logo-mybc.svg" alt="MYBC" />
         <h1 style={{ fontSize: 24, fontWeight: 900, color: '#FFFFFF', margin: '4px 0 0', letterSpacing: 1 }}>Plinko</h1>
         {/* Mini peg pyramid with an endlessly dropping ball */}
         <div className="load-board" aria-hidden="true">
@@ -295,6 +294,7 @@ export default function App() {
         <div className="loading-bar-wrap"><div className="loading-bar" /></div>
         <LoadingQuip />
       </div>
+      <img className="loading-logo" src="/logo-mybc.svg" alt="MYBC" />
     </div>
   );
 

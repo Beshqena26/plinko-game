@@ -882,7 +882,12 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .loading-content { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.loading-logo { width: 96px; height: auto; }
+/* MYBC wordmark pinned to the loader's bottom edge (brand sign-off spot) */
+.loading-logo {
+  position: absolute; bottom: calc(28px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  width: 72px; height: auto; opacity: 0.85;
+}
 
 /* Mini peg pyramid: a lone ball forever zigzagging down four peg rows */
 .load-board {
