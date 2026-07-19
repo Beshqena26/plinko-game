@@ -53,10 +53,10 @@ function initFreeGrant(): FreeGrant | null {
     localStorage.removeItem('plinko_free');
     return null;
   }
-  try {
-    const saved = JSON.parse(localStorage.getItem('plinko_free') || 'null') as FreeGrant | null;
-    if (saved && saved.status === 'active' && saved.roundsUsed < saved.roundsTotal) return saved;
-  } catch { /* corrupted — ignore */ }
+  // No demo param → always the normal paid game. The grant is URL-scoped:
+  // restoring a half-played demo grant on every plain visit made the game
+  // look permanently stuck in free-rounds mode.
+  localStorage.removeItem('plinko_free');
   return null;
 }
 
