@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
-import type { GameSpeed } from '../hooks/usePlinkoGame';
+import type { GameSpeed, FreeGrant } from '../hooks/usePlinkoGame';
 import { fmt } from '../utils/format';
 import { sound } from '../utils/sound';
 
@@ -28,8 +28,11 @@ interface Props {
   ballsInFlight: number;
   autoPlayed: number;
   totalAutoRounds: string;
-  onPlay: () => void;
+  // Returns whether a round actually started — false stops the pour
+  onPlay: () => boolean | Promise<boolean>;
   onStopAuto: () => void;
+  freeGrant: FreeGrant | null;
+  freeEnding: boolean;
 }
 
 const FlameSVG = () => (
@@ -40,6 +43,13 @@ const DiceSVG = () => (
 );
 const ThumbSVG = () => (
   <svg viewBox="0 0 24 24" width="13" height="13" fill="#22C55E"><path d="M21.3 10.1C20.7 9.4 19.9 9 19 9H14.4L15 7.6C15.8 5.5 14.7 3.1 12.6 2.3C12.1 2.1 11.6 2 11.1 2C10.7 2 10.3 2.2 10.2 2.6L7.3 9H5C3.3 9 2 10.3 2 12V19C2 20.7 3.3 22 5 22H17.7C19.2 22 20.4 21 20.7 19.5L22 12.5C22.1 11.7 21.9 10.8 21.3 10.1ZM7 20H5C4.4 20 4 19.6 4 19V12C4 11.4 4.4 11 5 11H7V20Z"/></svg>
+);
+
+const GiftSVG = () => (
+  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" />
+    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+  </svg>
 );
 
 const BoltSVG = () => (
@@ -59,7 +69,7 @@ export default function BgControls({
   balance, betStr, setBetStr, risk, setRisk, mode, setMode,
   autoRounds, setAutoRounds,
   autoRunning, ballsInFlight, autoPlayed, totalAutoRounds,
-  onPlay, onStopAuto, speed, setSpeed,
+  onPlay, onStopAuto, speed, setSpeed, freeGrant, freeEnding,
 }: Props) {
   // No cap on simultaneous balls — PLAY can be spammed freely. Risk/lines/
   // mode still lock while any ball is in flight (the board must not change
@@ -78,7 +88,7 @@ export default function BgControls({
       if (e.repeat || e.target instanceof HTMLInputElement) return;
       if (e.code === 'Space') {
         e.preventDefault();
-        if (autoRunning) onStopAuto(); else onPlay();
+        if (autoRunning) onStopAuto(); else void onPlay();
       }
     };
     window.addEventListener('keydown', fn);
@@ -117,18 +127,26 @@ export default function BgControls({
     if (pourInterval.current != null) { clearInterval(pourInterval.current); pourInterval.current = null; }
   };
   useEffect(() => stopPour, []);
+  // A disabled button swallows pointerup/pointerleave, so the pour can't rely
+  // on release events alone — it also stops the moment a drop is refused
+  // (free rounds exhausted, insufficient balance) or the grant enters its
+  // ending state mid-hold.
+  useEffect(() => { if (freeEnding) stopPour(); }, [freeEnding]);
+  const pourTick = () => {
+    void Promise.resolve(onPlay()).then(ok => { if (ok === false) stopPour(); });
+  };
   const onPlayPointerDown = () => {
     if (mode !== 'manual' || autoRunning) return;
     suppressClick.current = false;
     pourTimer.current = window.setTimeout(() => {
       suppressClick.current = true;
-      onPlay();
-      pourInterval.current = window.setInterval(onPlay, POUR_EVERY_MS);
+      pourTick();
+      pourInterval.current = window.setInterval(pourTick, POUR_EVERY_MS);
     }, POUR_HOLD_MS);
   };
   const onPlayClick = () => {
     if (suppressClick.current) { suppressClick.current = false; return; }
-    onPlay();
+    void onPlay();
   };
 
   const speedChips = (['slow', 'normal', 'instant'] as GameSpeed[]).map(v => (
@@ -168,22 +186,24 @@ export default function BgControls({
           </button>
         ) : (
           <button
-            className="play-btn"
+            className={`play-btn${freeGrant ? ' free-mode' : ''}`}
             onClick={onPlayClick}
             onPointerDown={onPlayPointerDown}
             onPointerUp={stopPour}
             onPointerLeave={stopPour}
             onPointerCancel={stopPour}
-            disabled={balance < MIN_BET}
+            disabled={freeGrant ? freeEnding : balance < MIN_BET}
           >
             <svg className="play-btn-arc" viewBox="0 0 60 20" width="52" height="17" fill="none">
               <path d="M4 16 Q 14 2 26 14 Q 38 26 52 5" stroke="#E9A53C" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="0.1 6.5" />
               <circle cx="53" cy="4.4" r="3.6" fill="#E9375B" />
             </svg>
-            <span className="play-btn-label">PLAY</span>
-            {mode === 'auto' && (
-              <span className="play-btn-count">×{autoRounds === '0' ? '∞' : autoRounds}</span>
-            )}
+            <span className="play-btn-label">{freeGrant ? 'FREE' : 'PLAY'}</span>
+            {freeGrant
+              ? <span className="play-btn-count">{Math.max(0, freeGrant.roundsTotal - freeGrant.roundsUsed)} left</span>
+              : mode === 'auto' && (
+                <span className="play-btn-count">×{autoRounds === '0' ? '∞' : autoRounds}</span>
+              )}
           </button>
         )}
 
@@ -229,6 +249,19 @@ export default function BgControls({
       {/* Mobile: Speed gets its own full-width row (the card is too narrow) */}
       <div className="bgc-speed-row">{speedChips}</div>
 
+      {freeGrant ? (
+        <div className="free-round-slot">
+          <div className="frs-row1">
+            <span className="free-round-ico"><GiftSVG /></span>
+            <span className="frs-label">Free Round</span>
+            <span className="frs-count">{Math.min(freeGrant.roundsUsed, freeGrant.roundsTotal)}/{freeGrant.roundsTotal}</span>
+          </div>
+          <div className="frs-row2">
+            <span className="frs-bet">Bet {fmt(freeGrant.betAmount)}</span>
+            <span className="frs-tw">Total Win <b>+{fmt(freeGrant.winnings)}</b></span>
+          </div>
+        </div>
+      ) : (
       <div className="bgc-bet-row">
         <div className="bgc-bet-side">
           <button className="bgc-pill" disabled={betLocked || bet <= MIN_BET} onMouseEnter={hover(!betLocked && bet > MIN_BET)} onClick={() => { sound.uiClick(); setBetStr(MIN_BET.toFixed(2)); }}>Min</button>
@@ -243,6 +276,7 @@ export default function BgControls({
           <button className="bgc-pill" disabled={betLocked || Math.abs(bet - affordableMax) < 1e-9} onMouseEnter={hover(!betLocked && Math.abs(bet - affordableMax) >= 1e-9)} onClick={() => { sound.uiClick(); setBetStr(affordableMax.toFixed(2)); }}>Max</button>
         </div>
       </div>
+      )}
 
       <div className="bgc-balance">Balance <b>{fmt(balance)}</b></div>
     </div>

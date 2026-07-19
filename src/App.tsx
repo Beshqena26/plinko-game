@@ -46,7 +46,7 @@ function HistRows({ history, onRowClick }: { history: BetResult[]; onRowClick: (
       {history.slice(0, 8).map(h => (
         <button key={h.id} className="fx-hist-row" onClick={onRowClick}>
           <span>{new Date(h.time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-          <span>{h.bet.toFixed(2)}</span>
+          <span>{h.free ? <em className="free-badge">FREE</em> : h.bet.toFixed(2)}</span>
           <span>{h.pay.toFixed(2)}</span>
           <span style={{ color: h.profit >= 0 ? '#46E144' : '#FF7B93' }}>
             {h.profit >= 0 ? '+' : ''}{h.profit.toFixed(2)}
@@ -132,6 +132,7 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
   const [statsOpen, setStatsOpen] = useState(false);
+  const [freeWelcome, setFreeWelcome] = useState(false);
 
   const game = usePlinkoGame(rows, risk);
   // Below 360×640 the control cluster scales uniformly instead of reflowing
@@ -155,15 +156,21 @@ export default function App() {
 
   // BGaming behavior: in Auto mode PLAY runs "Number of bets" rounds
   // (∞ when set to 0); the STOP orb ends the run early.
-  const onPlay = () => {
-    if (mode === 'auto') game.startAuto(game.autoRounds);
-    else void game.drop();
+  const onPlay = (): boolean | Promise<boolean> => {
+    // Space fires here too — never drop balls behind a blocking overlay
+    if (freeWelcome || game.freeSummary || game.autoSummary) return false;
+    if (mode === 'auto') { game.startAuto(game.autoRounds); return true; }
+    return game.drop();
   };
 
   useEffect(() => {
-    const tm = setTimeout(() => setLoading(false), 2200);
+    const tm = setTimeout(() => {
+      setLoading(false);
+      if (game.freeGrant && game.freeGrant.status === 'active') setFreeWelcome(true);
+    }, 2200);
     sound.armMusicAutostart();
     return () => clearTimeout(tm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // close the header dots menu / audio panel on any outside click
@@ -405,11 +412,15 @@ export default function App() {
               autoRunning={game.autoRunning}
               ballsInFlight={game.ballsInFlight}
               autoPlayed={game.autoPlayed}
-              totalAutoRounds={game.autoRounds === '0' ? '∞' : game.autoRounds}
+              totalAutoRounds={game.autoRunning
+                ? (game.autoLimit === Infinity ? '∞' : String(game.autoLimit))
+                : (game.autoRounds === '0' ? '∞' : game.autoRounds)}
               onPlay={onPlay}
               onStopAuto={game.stopAuto}
               speed={game.speed}
               setSpeed={game.setSpeed}
+              freeGrant={game.freeGrant}
+              freeEnding={game.freeEnding}
             />
             </ScaleBox>
               </div>
@@ -448,7 +459,48 @@ export default function App() {
       />
       <HistoryDrawer open={histOpen} onClose={() => setHistOpen(false)} rounds={game.history} session={game.session} />
 
-      {game.autoSummary && (
+      {freeWelcome && game.freeGrant && (
+        <div className="modal-overlay show">
+          <div className="modal free-bet-welcome">
+            <div className="fbw-icon">
+              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" />
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+              </svg>
+            </div>
+            <h2>{game.freeGrant.roundsUsed > 0 ? 'Welcome back!' : 'Congratulations!'}</h2>
+            <div className="fbw-desc">
+              {game.freeGrant.roundsUsed > 0
+                ? <>You have <b className="fbw-hl">{game.freeGrant.roundsTotal - game.freeGrant.roundsUsed}</b> free rounds left</>
+                : <>You received <b className="fbw-hl">{game.freeGrant.roundsTotal}</b> free rounds</>}
+            </div>
+            <div className="fbw-sub">Bet {fmt(game.freeGrant.betAmount)} per round — winnings are yours to keep</div>
+            <button className="fbs-btn" onClick={() => setFreeWelcome(false)}>Start</button>
+          </div>
+        </div>
+      )}
+
+      {game.freeSummary && (
+        <div className="modal-overlay show">
+          <div className="modal free-bet-summary">
+            <div className="fbs-icon fbs-icon-win">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><line x1="12" y1="22" x2="12" y2="7" />
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+              </svg>
+            </div>
+            <h2>Free Rounds Complete</h2>
+            <div className="fbs-played">Played {game.freeSummary.rounds} rounds</div>
+            <div className="fbs-winnings fbs-win">
+              <span className="fbs-winnings-label">Total Winnings</span>
+              <span className="fbs-winnings-val" style={{ color: 'var(--green)' }}>+{fmt(game.freeSummary.winnings)}</span>
+            </div>
+            <button className="fbs-btn" onClick={game.clearFree}>Continue Playing</button>
+          </div>
+        </div>
+      )}
+
+      {game.autoSummary && !game.freeSummary && (
         <div className="modal-overlay show" onClick={() => game.setAutoSummary(null)}>
           <div className="modal free-bet-summary" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={() => game.setAutoSummary(null)}>&times;</button>

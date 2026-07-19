@@ -441,6 +441,75 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .audio-slider:disabled { opacity: 0.35; cursor: not-allowed; }
 
+/* ===== FREE ROUNDS (ported from limbo/hilo) ===== */
+.free-round-slot {
+  width: min(440px, 100%);
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(247, 147, 26, 0.15), rgba(247, 147, 26, 0.05));
+  border: 1px solid rgba(247, 147, 26, 0.35); border-radius: 10px;
+}
+.frs-row1, .frs-row2 { display: flex; align-items: center; gap: 8px; }
+.free-round-ico { display: flex; color: var(--accent); }
+.frs-label {
+  font-size: 12px; font-weight: 800; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.frs-count {
+  margin-left: auto; font-size: 13px; font-weight: 700; color: #fff;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+}
+.frs-bet { font-size: 12px; font-weight: 700; color: var(--text-75); }
+.frs-tw { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-mid); }
+.frs-tw b {
+  color: var(--green); font-weight: 800;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
+}
+
+/* Pulsing FREE play orb (hilo pattern) */
+.play-btn.free-mode { animation: freeBetPulse 1.8s ease-in-out infinite; }
+@keyframes freeBetPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 5px rgba(247, 147, 26, 0.25), 0 0 0 6px rgba(247, 147, 26, 0.45),
+      0 10px 30px rgba(247, 147, 26, 0.35), inset 0 2px 2px rgba(255, 255, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(247, 147, 26, 0.35), 0 0 0 10px rgba(247, 147, 26, 0.55),
+      0 10px 42px rgba(247, 147, 26, 0.55), inset 0 2px 2px rgba(255, 255, 255, 0.35);
+  }
+}
+.play-btn-count { font-size: 10px; font-weight: 700; opacity: 0.92; font-family: 'JetBrains Mono', monospace; }
+
+/* Welcome modal */
+.free-bet-welcome { text-align: center; }
+.fbw-icon {
+  width: 64px; height: 64px; margin: 4px auto 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, rgba(247, 147, 26, 0.25), rgba(247, 147, 26, 0.08));
+  border: 1px solid rgba(247, 147, 26, 0.45); border-radius: 18px;
+  color: var(--accent);
+  animation: fbwBounce 1.6s ease-in-out infinite;
+}
+@keyframes fbwBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.free-bet-welcome h2 { text-align: center; }
+.fbw-desc { font-size: 13px; color: var(--text-75); margin-bottom: 6px; }
+.fbw-hl { color: var(--accent); font-weight: 800; }
+.fbw-sub { font-size: 11.5px; color: var(--text-mid); margin-bottom: 16px; }
+
+/* Completion summary bits (fbs-* card styles already exist) */
+.fbs-played { text-align: center; font-size: 12.5px; color: var(--text-75); margin-bottom: 12px; }
+
+/* FREE badge in history tables */
+.free-badge {
+  font-style: normal; font-size: 9px; font-weight: 800;
+  color: var(--accent); letter-spacing: 0.05em;
+  border: 1px solid rgba(247, 147, 26, 0.45); border-radius: 4px;
+  padding: 1px 4px;
+}
+
 /* ===== SYSTEM ALERT TOAST ===== */
 /* Styled like the game's purple control cards: dark panel, hairline border,
    brand-orange accent — not a generic red error pill. */
