@@ -882,6 +882,40 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 .loading-content { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.loading-logo { width: 96px; height: auto; }
+
+/* Mini peg pyramid: a lone ball forever zigzagging down four peg rows */
+.load-board {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 9px;
+  padding: 14px 0 4px; margin-top: 2px;
+}
+.load-peg-row { display: flex; gap: 14px; }
+.load-peg { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, 0.5); }
+.load-ball {
+  position: absolute; top: 2px; left: 50%;
+  width: 9px; height: 9px; margin-left: -4.5px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(247, 147, 26, 0.85);
+  animation: loadDrop 1.6s linear infinite;
+  z-index: 1;
+}
+/* Zigzag one peg-pitch (±9.5px) per 14px row, quick fade-out at the bottom */
+@keyframes loadDrop {
+  0%   { transform: translate(0, 0); opacity: 1; }
+  10%  { transform: translate(0, 2px); }
+  28%  { transform: translate(-9.5px, 16px); }
+  46%  { transform: translate(9.5px, 30px); }
+  64%  { transform: translate(0px, 44px); }
+  82%  { transform: translate(-9.5px, 58px); opacity: 1; }
+  92%  { transform: translate(-9.5px, 64px); opacity: 0; }
+  100% { transform: translate(0, 0); opacity: 0; }
+}
+.loading-quip { animation: quipIn 0.3s ease; min-height: 18px; }
+@keyframes quipIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .loading-bar-wrap {
   width: 160px; height: 3px;
   background: rgba(255,255,255,0.08);

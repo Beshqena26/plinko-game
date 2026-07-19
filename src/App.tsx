@@ -115,6 +115,25 @@ function ScaleBox({ scale, children }: { scale: number; children: React.ReactNod
   );
 }
 
+// Rotating tongue-in-cheek status lines for the loading screen
+const LOAD_QUIPS = [
+  'Polishing the pins…',
+  'Bribing gravity…',
+  'Teaching balls to bounce…',
+  'Counting balls… all of them',
+  'Warming up the 1000× pocket…',
+  'Untangling the physics…',
+];
+
+function LoadingQuip() {
+  const [i, setI] = useState(() => Math.floor(Math.random() * LOAD_QUIPS.length));
+  useEffect(() => {
+    const t = setInterval(() => setI(v => (v + 1) % LOAD_QUIPS.length), 750);
+    return () => clearInterval(t);
+  }, []);
+  return <p className="loading-text loading-quip" key={i}>{LOAD_QUIPS[i]}</p>;
+}
+
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState(16);
@@ -262,10 +281,19 @@ export default function App() {
   if (loading) return (
     <div className="loading-screen">
       <div className="loading-content">
-        <PlinkoIcon size={44} />
-        <h1 style={{ fontSize: 24, fontWeight: 900, color: '#FFFFFF', margin: '12px 0 4px', letterSpacing: 1 }}>Plinko</h1>
+        <img className="loading-logo" src="/logo-mybc.svg" alt="MYBC" />
+        <h1 style={{ fontSize: 24, fontWeight: 900, color: '#FFFFFF', margin: '4px 0 0', letterSpacing: 1 }}>Plinko</h1>
+        {/* Mini peg pyramid with an endlessly dropping ball */}
+        <div className="load-board" aria-hidden="true">
+          <span className="load-ball" />
+          {[2, 3, 4, 5].map(n => (
+            <div key={n} className="load-peg-row">
+              {Array.from({ length: n }, (_, i) => <span key={i} className="load-peg" />)}
+            </div>
+          ))}
+        </div>
         <div className="loading-bar-wrap"><div className="loading-bar" /></div>
-        <p className="loading-text">Loading game…</p>
+        <LoadingQuip />
       </div>
     </div>
   );
