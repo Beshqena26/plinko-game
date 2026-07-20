@@ -3,7 +3,7 @@ import { getBucketColor, slotProbability } from '../utils/multipliers';
 import { getGeometry, bucketAt } from '../game/geometry';
 import type { BoardGeometry } from '../game/geometry';
 import {
-  drawEntryHole, drawPinGlows, drawPins, drawBuckets, drawParticles,
+  drawEntryHole, drawTriangleEdges, drawPinGlows, drawPins, drawBuckets, drawParticles,
   drawBall, drawWinPopups, spawnWinParticles,
 } from '../game/render';
 import type { PinGlow, TrailDot, WinPopup, Particle } from '../game/render';
@@ -103,6 +103,11 @@ export default function PlinkoBoard({
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
       sizeRef.current = { w: rect.width, h: rect.height };
+      // Publish the board's right edge so the lines rail can hug the buckets
+      // (desktop: left = --board-right + 20px) instead of the screen edge.
+      const geo = geometry(rect.width, rect.height);
+      (parent.closest('.game-area') as HTMLElement | null)
+        ?.style.setProperty('--board-right', `${geo.bucketRightX}px`);
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -112,7 +117,7 @@ export default function PlinkoBoard({
       ro.disconnect();
       window.removeEventListener('resize', resize);
     };
-  }, []);
+  }, [geometry]);   // geometry changes with rows — keep --board-right fresh
 
   const settle = useCallback((id: number, targetSlot: number) => {
     const { w, h } = sizeRef.current;
@@ -183,6 +188,7 @@ export default function PlinkoBoard({
       const bucketTopY = geo.bucketTopY;
 
       drawEntryHole(ctx, geo, w);
+      drawTriangleEdges(ctx, geo, w);
       pinGlowsRef.current = pinGlowsRef.current.filter(g => now - g.time < 250);
       drawPinGlows(ctx, pinGlowsRef.current, pinR, now);
       drawPins(ctx, geo, pinGlowsRef.current);
