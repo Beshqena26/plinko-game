@@ -15,6 +15,34 @@ import type { BetResult, SessionStats } from './hooks/usePlinkoGame';
 export type { BetResult, AutoSummary, QueuedBall } from './hooks/usePlinkoGame';
 export { fmt };
 
+/* Auto-fit for the board's absolute overlays (lines rail + mobile session
+   stats). When the game area is shorter than the rail's natural height —
+   the prod iframe embeds eat vertical space — both overlays scale down
+   proportionally via the --rail-scale var so they never clip. Transform
+   only: the layout itself is untouched at every size (scale stays 1 on
+   tall/standalone viewports). */
+function useOverlayFit(
+  areaRef: React.RefObject<HTMLDivElement | null>,
+  railRef: React.RefObject<HTMLDivElement | null>,
+  ready: boolean,   // false while the loading screen is up — the refs don't exist yet
+) {
+  useEffect(() => {
+    if (!ready) return;
+    const area = areaRef.current, rail = railRef.current;
+    if (!area || !rail) return;
+    const fit = () => {
+      // offsetHeight ignores the transform, so this is the rail's natural
+      // (unscaled) height — no feedback loop with the scale we set.
+      const s = Math.min(1, (area.clientHeight - 16) / rail.offsetHeight);
+      area.style.setProperty('--rail-scale', String(Math.max(0.5, s)));
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(area); ro.observe(rail);
+    fit();
+    return () => ro.disconnect();
+  }, [areaRef, railRef, ready]);
+}
+
 /* Session totals (rounds / total bet / net profit) — desktop table footer,
    history drawer header, and the mobile swipe-in panel all share this. */
 export function SessionStatsBlock({ session }: { session: SessionStats }) {
@@ -151,9 +179,19 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [faved, setFaved] = useState(() => localStorage.getItem('fav_plinko') === 'true');
   const [statsOpen, setStatsOpen] = useState(false);
+  // Overlay auto-fit (lines rail + mob session) for short embedded viewports
+  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const linesRailRef = useRef<HTMLDivElement>(null);
+  useOverlayFit(gameAreaRef, linesRailRef, !loading);
   const [freeWelcome, setFreeWelcome] = useState(false);
 
   const game = usePlinkoGame(rows, risk);
+  // When an auto run ends (finished or stopped), snap straight back to Manual
+  const wasAutoRunning = useRef(false);
+  useEffect(() => {
+    if (wasAutoRunning.current && !game.autoRunning) setMode('manual');
+    wasAutoRunning.current = game.autoRunning;
+  }, [game.autoRunning]);
   // Below 360×640 the control cluster scales uniformly instead of reflowing
   const uiScale = useUiScale(360, 640);
 
@@ -175,10 +213,12 @@ export default function App() {
 
   // BGaming behavior: in Auto mode PLAY runs "Number of bets" rounds
   // (∞ when set to 0); the STOP orb ends the run early.
-  const onPlay = (): boolean | Promise<boolean> => {
+  const onPlay = (roundsOverride?: string): boolean | Promise<boolean> => {
     // Space fires here too — never drop balls behind a blocking overlay
     if (freeWelcome || game.freeSummary || game.autoSummary) return false;
-    if (mode === 'auto') { game.startAuto(game.autoRounds); return true; }
+    // roundsOverride: the count-picker starts the run in the same click, before
+    // the setAutoRounds state lands — pass the picked value straight through
+    if (mode === 'auto' || roundsOverride != null) { game.startAuto(roundsOverride ?? game.autoRounds); return true; }
     return game.drop();
   };
 
@@ -390,7 +430,7 @@ export default function App() {
                   <SessionStatsBlock session={game.session} />
                 </div>
 
-                <div className="game-area">
+                <div className="game-area" ref={gameAreaRef}>
                   <PlinkoBoard rows={rows} multipliers={mults} bet={game.bet} onBallLand={game.onLand}
                     ballQueue={game.ballQueue} onBallConsumed={game.onConsumed} paths={game.paths} />
 
@@ -408,7 +448,7 @@ export default function App() {
                   </div>
 
                   {/* Lines rail: rows selector on the board edge */}
-                  <div className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
+                  <div ref={linesRailRef} className={`lines-rail${game.ballsInFlight > 0 || game.autoRunning ? ' locked' : ''}`}>
                     <span className="lines-rail-label">Lines</span>
                     {[8, 9, 10, 11, 12, 13, 14, 15, 16].map(n => {
                       const disabled = game.ballsInFlight > 0 || game.autoRunning;

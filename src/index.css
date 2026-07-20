@@ -176,13 +176,18 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
    (identical offsets — PLAY orb exactly under the pyramid); the history
    table gets the left space */
 @media (min-width: 1001px) {
-  .game-area { margin-left: 17%; }
-  .bgc { margin-left: 17%; }
+  .game-area { margin-left: calc(17% + 40px); }
+  .bgc { margin-left: calc(17% + 40px); }
 }
 
 /* ===== BGaming-style Lines rail (rows selector on the board edge) ===== */
 .lines-rail {
-  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 10px; top: 50%;
+  /* --rail-scale (set by useOverlayFit on .game-area) shrinks the rail
+     proportionally when the game area is too short for it (prod iframes) —
+     same design, just smaller; 1 on tall viewports */
+  transform: translateY(-50%) scale(var(--rail-scale, 1));
+  transform-origin: right center;
   /* Above the board canvas but below the header (z 10) so header popovers
      (dots menu, audio panel) always cover the rail */
   display: flex; flex-direction: column; gap: 2px; z-index: 5;
@@ -207,6 +212,16 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .lines-rail.locked { opacity: 0.55; }
 .lines-rail-btn:disabled { cursor: not-allowed; }
+/* Desktop: rail hugs the board — 20px right of the bucket row's edge
+   (published as --board-right by PlinkoBoard) instead of the screen edge.
+   Must come after the base .lines-rail rule so right:auto wins. */
+@media (min-width: 1001px) {
+  .lines-rail {
+    right: auto;
+    left: calc(var(--board-right, calc(100% - 64px)) + 20px);
+    transform-origin: left center;
+  }
+}
 
 /* ===== BGaming-style control cluster ===== */
 .bgc {
@@ -231,6 +246,8 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   border-radius: 12px; padding: 8px;
   min-width: 128px;
 }
+/* Anchor for the floating number-of-bets panel */
+.bgc-mode { position: relative; }
 /* White icon squares (BGaming style) */
 .bgc-ico {
   width: 16px; height: 16px; flex-shrink: 0;
@@ -239,41 +256,72 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .bgc-ico svg { width: 100%; height: 100%; }
 .bgc-ico b { font-size: 13px; }
-/* Instant Bet toggle row (bottom of the Bet Mode card) */
-.bgc-instant {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin-top: 3px; padding: 8px 4px 2px;
-  border-top: 1px solid var(--hairline);
+/* Speed pill under the PLAY orb (reference: slot turbo button) — oval, three
+   bolts, lit count = current speed (1 slow / 2 normal / 3 instant), tap cycles.
+   Absolutely positioned below the orb so it adds zero layout height. */
+.play-wrap {
+  position: relative; align-self: center;
+  display: flex; flex-direction: column; align-items: center;
 }
-.bgc-instant-label {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: 700; color: var(--text-75);
+.bgc-speed-pill {
+  /* Straddles the orb's bottom edge (like the reference turbo pill) instead
+     of floating below it — keeps clear of the BET row underneath */
+  position: absolute; bottom: -11px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  height: 24px; padding: 0 14px; border-radius: 999px;
+  background: rgba(23, 23, 50, 0.95);
+  border: 1px solid rgba(247, 147, 26, 0.55);
+  box-shadow: 0 2px 8px rgba(10, 8, 24, 0.5), inset 0 1px 1px rgba(255,255,255,0.08);
+  cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent;
+  z-index: 6;
 }
-.bgc-instant-label svg { color: var(--accent); }
-.bgc-speed { display: flex; gap: 4px; }
-/* Standalone mobile speed row (hidden on desktop where the card hosts it) */
-.bgc-speed-row {
-  display: none; width: min(440px, 100%); gap: 8px;
-}
-.bgc-speed-row .bgc-speed-btn {
-  flex: 1; height: 27px; font-size: 11px; border-radius: 8px;
-}
-.bgc-speed-btn {
-  height: 22px; padding: 0 8px;
-  background: var(--board); border: 1px solid var(--hairline); border-radius: 6px;
-  color: var(--text-75); font-size: 10px; font-weight: 700; font-family: inherit;
+.bgc-speed-pill:hover { filter: brightness(1.15); }
+.bgc-speed-pill:active { transform: translateX(-50%) scale(0.94); }
+.bgc-speed-bolt { display: flex; color: var(--text-mid); opacity: 0.25; transition: all 0.15s; }
+.bgc-speed-bolt.lit { opacity: 1; color: var(--accent); }
+.bgc-speed-bolt.lit svg { fill: currentColor; }
+
+
+.bgc-nob { display: flex; flex-direction: column; gap: 3px; padding-top: 2px; }
+/* Preset count chips (reference: slot auto-spin bar — 10 | 20 | 50 | 100 | ∞) */
+.bgc-nob-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.bgc-nob-chip {
+  height: 26px; border-radius: 7px;
+  background: #171732; border: 1px solid var(--hairline);
+  color: #fff; font-size: 12px; font-weight: 700;
+  font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
   cursor: pointer; transition: all 0.12s; -webkit-tap-highlight-color: transparent;
 }
-.bgc-speed-btn.active {
-  background: var(--accent-glow); border-color: var(--accent-border);
-  color: #fff;
+.bgc-nob-chip:hover:not(:disabled) { background: #272859; }
+.bgc-nob-chip.active { background: var(--accent-glow); border-color: var(--accent); }
+.bgc-nob-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Auto-only count picker: looks like the card growing under the Auto button,
+   but is actually an absolute extension hanging off the card's bottom edge —
+   the card's real height never changes, so the board/layout cannot jump.
+   Overlaps whatever sits below (the +/Max pills) while open. */
+.bgc-nob-float {
+  position: absolute; top: 100%; left: -1px; right: -1px; z-index: 8;
+  padding: 2px 8px 8px;
+  background: rgba(35, 32, 78, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.10); border-top: none;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 12px 24px rgba(10, 8, 24, 0.45);
+  animation: nobPop 0.15s ease;
 }
-
-
-.bgc-nob { display: flex; flex-direction: column; gap: 3px; padding-top: 2px; transition: opacity 0.15s; }
-/* dimmed while Manual is selected — present in both modes so the card
-   height never changes and mode switching cannot move the layout */
-.bgc-nob-off { opacity: 0.4; }
+/* While open, square the card's bottom so card + extension read as one piece */
+.bgc-mode.nob-open {
+  border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+/* Permanent spacer below the Bet Mode card, exactly the extension's height —
+   the bet row always sits BELOW the open-counter zone, so opening the counter
+   neither jumps the layout nor overlaps anything. */
+.bgc-block-mode::after { content: ''; display: block; height: 56px; }
+@media (max-width: 1000px) { .bgc-block-mode::after { height: 48px; } }
+@keyframes nobPop {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .bgc-nob-label { font-size: 11px; font-weight: 600; color: #C9C3E8; text-align: center; }
 .bgc-nob-row { display: flex; align-items: center; gap: 4px; }
 .bgc-nob-btn {
@@ -315,6 +363,9 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* Big round PLAY button (BGaming signature) */
 .play-btn {
+  /* above the .play-fire layer (z:0) so the orb face stays clean while fire
+     wraps around it */
+  position: relative; z-index: 1;
   user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   width: 104px; height: 104px; border-radius: 50%;
   border: none; cursor: pointer; flex-shrink: 0;
@@ -334,6 +385,96 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 .play-btn:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
 .play-btn:active:not(:disabled) { transform: scale(0.96); }
+
+/* ── Hold-to-rapid-fire: hint + burning orb ── */
+.play-btn-hold {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 8.5px; font-weight: 800; letter-spacing: 0.14em;
+  /* fire tone — reads on the orb's light center (white was invisible) */
+  color: #E9481E;
+  text-shadow: 0 0 6px rgba(255, 140, 40, 0.35);
+}
+/* While pouring: the orb overheats — recoil shake, hotter ring, flames below */
+.play-btn.on-fire {
+  animation: orbRecoil 0.13s linear infinite;
+  box-shadow:
+    0 0 0 5px rgba(247, 100, 26, 0.4),
+    0 0 0 6px rgba(233, 55, 26, 0.55),
+    0 10px 34px rgba(233, 88, 26, 0.65),
+    0 0 46px rgba(255, 120, 30, 0.5),
+    inset 0 2px 2px rgba(255,255,255,0.35);
+}
+@keyframes orbRecoil {
+  0%, 100% { transform: scale(0.96) translate(0, 0); }
+  25% { transform: scale(0.96) translate(-1px, 1px); }
+  75% { transform: scale(0.96) translate(1px, -1px); }
+}
+/* Fire layer: sibling BEHIND the orb inside .play-wrap (wrap bottom == orb
+   bottom, so flame coordinates track the orb) */
+.play-fire {
+  position: absolute; inset: 0;
+  pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 0;
+}
+.play-fire.on { opacity: 1; }
+/* ONE big flame engulfing the orb — classic fire-icon teardrop, layered
+   red→orange→yellow via ::before/::after. It renders BEHIND the button face
+   (negative z-index inside the button's stacking context), so the circle
+   masks the middle and only the fire beyond the rim shows: tip above the
+   button, body licking around the sides. */
+.play-flame-big {
+  position: absolute; left: 50%; bottom: -12px;
+  width: 148px; height: 210px;
+  margin-left: -74px;
+  transform-origin: 50% 100%;
+  border-radius: 50% 50% 50% 50% / 88% 88% 14% 14%;
+  background: radial-gradient(ellipse at 50% 78%, #FF9A1F 0%, #F4451E 50%, rgba(244, 63, 30, 0) 80%);
+  filter: blur(2.5px);
+  animation: bigFlick 0.4s ease-in-out infinite alternate;
+}
+/* inner flame */
+.play-flame-big::before {
+  content: ''; position: absolute; left: 14%; right: 14%; top: 20%; bottom: 2%;
+  border-radius: 46% 54% 50% 50% / 76% 80% 24% 20%;
+  background: radial-gradient(circle at 50% 78%, #FFC24A 0%, #FF8A1F 55%, rgba(255, 138, 31, 0) 85%);
+  animation: bigFlickInner 0.32s ease-in-out infinite alternate;
+}
+/* hot yellow core */
+.play-flame-big::after {
+  content: ''; position: absolute; left: 28%; right: 28%; top: 44%; bottom: 4%;
+  border-radius: 50% 50% 50% 50% / 72% 72% 28% 28%;
+  background: radial-gradient(circle at 50% 80%, #FFF3A0 0%, #FFD84A 50%, rgba(255, 216, 74, 0) 88%);
+}
+@keyframes bigFlick {
+  from { transform: scaleY(0.94) scaleX(1.03) rotate(-1.5deg); border-radius: 48% 52% 50% 50% / 78% 82% 22% 18%; }
+  to { transform: scaleY(1.06) scaleX(0.96) rotate(1.5deg); border-radius: 54% 46% 50% 50% / 84% 74% 20% 24%; }
+}
+@keyframes bigFlickInner {
+  from { transform: scaleY(0.92); }
+  to { transform: scaleY(1.1); }
+}
+/* Embers sparking off the orb */
+.play-ember {
+  /* rise from behind the orb's top rim so they're visible above the button */
+  position: absolute; bottom: 92%; width: 4px; height: 4px; border-radius: 50%;
+  background: #FFC24A; box-shadow: 0 0 6px 1px rgba(255, 150, 40, 0.9);
+  animation: emberFly 0.8s ease-out infinite;
+}
+.play-ember.e1 { left: 24%; animation-delay: 0s; }
+.play-ember.e2 { left: 44%; animation-delay: 0.28s; }
+.play-ember.e3 { left: 60%; animation-delay: 0.5s; }
+.play-ember.e4 { left: 76%; animation-delay: 0.14s; }
+@keyframes emberFly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--ember-dx, 10px), -46px) scale(0.3); opacity: 0; }
+}
+.play-ember.e1 { --ember-dx: -14px; }
+.play-ember.e2 { --ember-dx: 6px; }
+.play-ember.e3 { --ember-dx: -6px; }
+.play-ember.e4 { --ember-dx: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .play-btn.on-fire { animation: none; }
+  .play-flame-big, .play-ember { animation: none; display: none; }
+}
 .play-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .play-btn-label { font-size: 21px; font-weight: 900; letter-spacing: 0.06em; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
 .play-btn-sub { font-size: 9px; font-weight: 600; opacity: 0.9; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
@@ -987,8 +1128,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .hdr-desktop { display: none; }
   .hdr-mobile { display: flex; }
   /* Speed moves out of the narrow card into its own full-width row */
-  .bgc-instant { display: none; }
-  .bgc-speed-row { display: flex; }
+  .bgc-speed-pill { height: 22px; padding: 0 12px; }
   /* Both modes share identical geometry (ghost nob) — just the row rhythm */
   .bgc-main { min-height: 0; }
   .bgc { gap: 14px; }
@@ -1071,9 +1211,12 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 /* Compact session totals on the board's top-left (mobile only) — sits in the
    empty corner below where the win banner appears */
 .mob-session {
-  position: absolute; left: 10px; top: 92px; z-index: 20;
+  position: absolute; left: 10px; top: clamp(48px, 14%, 92px); z-index: 20;
   display: none; flex-direction: column; gap: 6px;
   pointer-events: none;
+  /* Shrinks with the lines rail on short embeds (see useOverlayFit) */
+  transform: scale(var(--rail-scale, 1));
+  transform-origin: left top;
 }
 .mob-session > div { display: flex; flex-direction: column; gap: 1px; }
 .mob-session span {

@@ -70,10 +70,77 @@ export function drawPinGlows(ctx: CanvasRenderingContext2D, glows: PinGlow[], pi
   });
 }
 
+// Triangle edges wrapping the pyramid: two soft glowing lines from the apex
+// (above the entry hole) down to the outer edges of the last pin row — the
+// board reads as a closed triangle funnel.
+export function drawTriangleEdges(ctx: CanvasRenderingContext2D, geo: BoardGeometry, w: number) {
+  const { gap, startY, bottomLeftX, bottomRightX, bucketTopY, verticalLabels } = geo;
+  const apexX = w / 2;
+  const pad = Math.max(5, gap * 0.18);
+  // Entry hole (drawEntryHole: centre startY − 1.05·gap, radius max(9, 0.42·gap))
+  const holeTop = startY - gap * 1.05 - Math.max(9, gap * 0.42);
+  // Base BELOW the multiplier chips (chip sizing mirrors drawBuckets)
+  const chipH = verticalLabels ? Math.min(gap * 2.7, Math.max(26, gap * 2.4)) : Math.max(17, gap * 0.8);
+  const baseY = bucketTopY + chipH + Math.max(6, gap * 0.3);
+  const rApex = Math.min(18, gap);
+
+  // Solve the shape so EVERYTHING stays inside at every line count:
+  // – base wide enough that the slanted edges clear the outer chips at their
+  //   TOP corners (the edge slopes inward as it rises, so that's the pinch)
+  // – apex high enough that the rounded tip's curve clears the hole
+  // The two depend on each other (angle ↔ apex height), so iterate.
+  const rBase = Math.min(18, gap * 0.9);
+  let apexY = holeTop - gap;
+  let leftX = bottomLeftX - gap * 0.55;
+  let rightX = bottomRightX + gap * 0.55;
+  for (let i = 0; i < 3; i++) {
+    const t = (bucketTopY - apexY) / (baseY - apexY);
+    leftX = apexX + (bottomLeftX - pad - apexX) / t;
+    rightX = apexX + (bottomRightX + pad - apexX) / t;
+    const halfAngle = Math.atan(((rightX - leftX) / 2) / (baseY - apexY));
+    const tipDrop = rApex * (1 / Math.sin(halfAngle) - 1); // curve top below vertex
+    apexY = holeTop - pad - tipDrop;
+  }
+  // The big base-corner arcs curve inward across the chip row's bottom
+  // corners — push the base out by a share of the radius to clear them.
+  leftX = Math.max(2, leftX - rBase * 0.45);
+  rightX = Math.min(w - 2, rightX + rBase * 0.45);
+
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo((leftX + apexX) / 2, (baseY + apexY) / 2);
+    ctx.arcTo(apexX, apexY, rightX, baseY, rApex);
+    ctx.arcTo(rightX, baseY, leftX, baseY, rBase);
+    ctx.arcTo(leftX, baseY, apexX, apexY, rBase);
+    ctx.closePath();
+  };
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  // soft outer glow pass, then a solid core line in the brand accent
+  for (const [width, color, blur] of [
+    [6, 'rgba(247, 147, 26, 0.18)', 10],
+    [2, '#F7931A', 0],
+  ] as const) {
+    path();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.shadowColor = 'rgba(247, 147, 26, 0.45)';
+    ctx.shadowBlur = blur;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // White glossy pins (BGaming style).
 export function drawPins(ctx: CanvasRenderingContext2D, geo: BoardGeometry, glows: PinGlow[]) {
   const { pins, pinR } = geo;
   pins.forEach(pin => {
+    // Skip the outermost pin of each row (cols 0 and row+2): the ball never
+    // touches them (it lands in cols 1..row+1) and the orange triangle now
+    // draws that edge — keeping them would just double the outline.
+    if (pin.col === 0 || pin.col === pin.row + 2) return;
     const isHit = glows.some(g => Math.abs(g.x - pin.x) < 2 && Math.abs(g.y - pin.y) < 2);
     ctx.beginPath();
     ctx.arc(pin.x, pin.y + pinR * 0.35, pinR * 1.05, 0, Math.PI * 2);

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RiskLevel } from '../utils/multipliers';
 import type { GameSpeed, FreeGrant } from '../hooks/usePlinkoGame';
 import { fmt } from '../utils/format';
@@ -29,7 +29,7 @@ interface Props {
   autoPlayed: number;
   totalAutoRounds: string;
   // Returns whether a round actually started — false stops the pour
-  onPlay: () => boolean | Promise<boolean>;
+  onPlay: (roundsOverride?: string) => boolean | Promise<boolean>;
   onStopAuto: () => void;
   freeGrant: FreeGrant | null;
   freeEnding: boolean;
@@ -105,6 +105,10 @@ export default function BgControls({
   // Hover blip for any enabled control (no-op on touch devices)
   const hover = (enabled: boolean) => () => { if (enabled) sound.uiHover(); };
 
+  // Number-of-bets picker: opens under Auto when selected; clicking Auto
+  // again toggles it.
+  const [nobOpen, setNobOpen] = useState(true);
+
   const stepAuto = (dir: 1 | -1) => {
     const i = AUTO_STEPS.indexOf(autoRounds);
     const cur = i === -1 ? 1 : i;
@@ -112,6 +116,7 @@ export default function BgControls({
     if (AUTO_STEPS[next] !== autoRounds) sound.uiClick();
     setAutoRounds(AUTO_STEPS[next]);
   };
+
 
   // Hold-to-pour: keep PLAY pressed (manual mode) and balls pour continuously
   // until release. A quick tap still drops exactly one ball — the pour only
@@ -122,9 +127,12 @@ export default function BgControls({
   const pourTimer = useRef<number | null>(null);
   const pourInterval = useRef<number | null>(null);
   const suppressClick = useRef(false);
+  // True while the pour is actually firing — drives the orb's fire effect
+  const [pouring, setPouring] = useState(false);
   const stopPour = () => {
     if (pourTimer.current != null) { clearTimeout(pourTimer.current); pourTimer.current = null; }
     if (pourInterval.current != null) { clearInterval(pourInterval.current); pourInterval.current = null; }
+    setPouring(false);
   };
   useEffect(() => stopPour, []);
   // A disabled button swallows pointerup/pointerleave, so the pour can't rely
@@ -140,6 +148,7 @@ export default function BgControls({
     suppressClick.current = false;
     pourTimer.current = window.setTimeout(() => {
       suppressClick.current = true;
+      setPouring(true);
       pourTick();
       pourInterval.current = window.setInterval(pourTick, POUR_EVERY_MS);
     }, POUR_HOLD_MS);
@@ -149,14 +158,30 @@ export default function BgControls({
     void onPlay();
   };
 
-  const speedChips = (['slow', 'normal', 'instant'] as GameSpeed[]).map(v => (
+  // Single cycling speed control: each click advances slow → normal → instant →
+  // slow. The three bolts show the current level (1 lit = slow, 2 = normal,
+  // 3 = instant) so the state reads at a glance without three separate chips.
+  const SPEED_ORDER: GameSpeed[] = ['slow', 'normal', 'instant'];
+  const speedLevel = SPEED_ORDER.indexOf(speed) + 1;
+  const cycleSpeed = () => {
+    sound.uiClick();
+    setSpeed(SPEED_ORDER[SPEED_ORDER.indexOf(speed) + 1] ?? SPEED_ORDER[0]);
+  };
+  // Oval pill under the PLAY orb (reference: slot turbo button) — 3 bolts,
+  // lit count = current speed; tap to cycle.
+  const speedButton = (
     <button
-      key={v}
-      className={`bgc-speed-btn${speed === v ? ' active' : ''}`}
-      onMouseEnter={hover(speed !== v)}
-      onClick={() => { if (speed !== v) sound.uiClick(); setSpeed(v); }}
-    >{v === 'slow' ? 'Slow' : v === 'normal' ? 'Normal' : 'Instant'}</button>
-  ));
+      className="bgc-speed-pill"
+      onMouseEnter={hover(true)}
+      onClick={cycleSpeed}
+      title={`Speed: ${speed === 'slow' ? 'Slow' : speed === 'normal' ? 'Normal' : 'Instant'}`}
+      aria-label={`Speed: ${speed} — click to change`}
+    >
+      {[1, 2, 3].map(n => (
+        <span key={n} className={`bgc-speed-bolt${speedLevel >= n ? ' lit' : ''}`}><BoltSVG /></span>
+      ))}
+    </button>
+  );
 
   return (
     <div className="bgc">
@@ -179,6 +204,13 @@ export default function BgControls({
           </div>
         </div>
 
+        <div className="play-wrap">
+        {/* Fire layer sits BEHIND the orb (earlier sibling, lower z-index):
+            the button face stays clean, only the flame beyond the rim shows */}
+        <span className={`play-fire${pouring ? ' on' : ''}`} aria-hidden="true">
+          <span className="play-flame-big" />
+          <span className="play-ember e1" /><span className="play-ember e2" /><span className="play-ember e3" /><span className="play-ember e4" />
+        </span>
         {autoRunning ? (
           <button className="play-btn stop" onClick={onStopAuto}>
             <span className="play-btn-label">STOP</span>
@@ -186,7 +218,7 @@ export default function BgControls({
           </button>
         ) : (
           <button
-            className={`play-btn${freeGrant ? ' free-mode' : ''}`}
+            className={`play-btn${freeGrant ? ' free-mode' : ''}${pouring ? ' on-fire' : ''}`}
             onClick={onPlayClick}
             onPointerDown={onPlayPointerDown}
             onPointerUp={stopPour}
@@ -201,15 +233,31 @@ export default function BgControls({
             <span className="play-btn-label">{freeGrant ? 'FREE' : 'PLAY'}</span>
             {freeGrant
               ? <span className="play-btn-count">{Math.max(0, freeGrant.roundsTotal - freeGrant.roundsUsed)} left</span>
-              : mode === 'auto' && (
+              : mode === 'auto' ? (
                 <span className="play-btn-count">×{autoRounds === '0' ? '∞' : autoRounds}</span>
+              ) : (
+                /* Manual: hold-to-rapid-fire hint — machine-gun + HOLD */
+                <span className="play-btn-hold">
+                  <svg viewBox="0 0 27 12" width="20" height="9" fill="currentColor">
+                    {/* body + grip */}
+                    <path d="M2 3.5h13v3.2h-5.6l-1.6 4h-3l1.3-4H2z" />
+                    {/* barrel */}
+                    <rect x="15" y="4.1" width="5.4" height="1.9" rx="0.6" />
+                    {/* muzzle flash */}
+                    <path d="M21.2 5 l2.6-2.4 -1.2 2.4 1.2 2.4z" opacity="0.9" />
+                    <path d="M23.6 5 l3-1 -1.8 1 1.8 1 -3-1z" opacity="0.55" />
+                  </svg>
+                  HOLD
+                </span>
               )}
           </button>
         )}
+        {speedButton}
+        </div>
 
-        <div className="bgc-block">
+        <div className="bgc-block bgc-block-mode">
           <span className="bgc-block-label">Bet Mode</span>
-          <div className="bgc-card bgc-mode">
+          <div className={`bgc-card bgc-mode${mode === 'auto' && nobOpen ? ' nob-open' : ''}`}>
             <button
               className={`bgc-opt${mode === 'manual' ? ' active-mode' : ''}`}
               onMouseEnter={hover(!locked)}
@@ -222,32 +270,32 @@ export default function BgControls({
             <button
               className={`bgc-opt${mode === 'auto' ? ' active-mode' : ''}`}
               onMouseEnter={hover(!locked)}
-              onClick={() => { if (mode !== 'auto') sound.uiClick(); setMode('auto'); }}
+              onClick={() => {
+                sound.uiClick();
+                if (mode !== 'auto') { setMode('auto'); setNobOpen(true); }
+                else setNobOpen(o => !o);   // already Auto → toggle the dropdown
+              }}
               disabled={locked}
             >
               <span className="bgc-ico"><b style={{ color: '#F43F5E' }}>A</b></span>
               Auto
             </button>
-            {/* Always present (dimmed in Manual) — the card never changes
-                height, so switching modes cannot move the layout */}
-            <div className={`bgc-nob${mode === 'auto' ? '' : ' bgc-nob-off'}`}>
-              <span className="bgc-nob-label">Number of bets</span>
-              <div className="bgc-nob-row">
-                <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[0])} onClick={() => stepAuto(-1)}>−</button>
-                <span className="bgc-nob-val">{autoRounds === '0' ? '∞' : autoRounds}</span>
-                <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[AUTO_STEPS.length - 1]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[AUTO_STEPS.length - 1])} onClick={() => stepAuto(1)}>+</button>
+            {/* Auto only: number-of-bets floats BELOW the card (absolute, out
+                of flow) — the card hugs its content in Manual and the cluster
+                height never changes, so mode switching cannot move the board */}
+            {mode === 'auto' && nobOpen && (
+              <div className="bgc-nob bgc-nob-float">
+                <span className="bgc-nob-label">Number of bets</span>
+                <div className="bgc-nob-row">
+                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[0]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[0])} onClick={() => stepAuto(-1)}>−</button>
+                  <span className="bgc-nob-val">{autoRounds === '0' ? '∞' : autoRounds}</span>
+                  <button className="bgc-nob-btn" disabled={autoRunning || autoRounds === AUTO_STEPS[AUTO_STEPS.length - 1]} onMouseEnter={hover(!autoRunning && autoRounds !== AUTO_STEPS[AUTO_STEPS.length - 1])} onClick={() => stepAuto(1)}>+</button>
+                </div>
               </div>
-            </div>
-            <div className="bgc-instant">
-              <span className="bgc-instant-label"><BoltSVG /> Speed</span>
-              <div className="bgc-speed">{speedChips}</div>
-            </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Mobile: Speed gets its own full-width row (the card is too narrow) */}
-      <div className="bgc-speed-row">{speedChips}</div>
 
       {/* Free slot is a single 30px line — exactly the bet row's height, so
           the swap back to the bet row when the grant ends cannot move the layout */}
